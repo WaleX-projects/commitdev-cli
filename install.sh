@@ -1,20 +1,36 @@
 #!/bin/sh
 set -e
 
-TARGET_DIR="/usr/local/bin"
+# Configuration
+REPO="WaleX-projects/commitdev-cli"
+VERSION="v1.0.4" # Or use "latest" to dynamically grab the newest version later
 BINARY_NAME="commitdev"
-REPO_URL="https://github.com/WaleX-projects/commitDev/releases/download/v1.0.0/commitdev"
+TARGET_DIR="/usr/local/bin"
 
-echo "💻 Desktop/Server environment detected."
-echo "📥 Downloading $BINARY_NAME..."
+echo "🚀 Starting commitdev installer..."
 
-# Download to a temporary file name to prevent local folder collisions
-curl -L -s -o "./commitdev_temp" "$REPO_URL"
+# 1. Detect Operating System architecture
+OS_TYPE=$(uname -s)
+if [ "$OS_TYPE" = "Linux" ]; then
+    ASSET_NAME="commitdev-linux"
+elif [ "$OS_TYPE" = "Darwin" ]; then
+    ASSET_NAME="commitdev-macos"
+else
+    echo "❌ Error: This install script only supports Linux and macOS. For Windows, download commitdev-windows.exe directly from GitHub Releases."
+    exit 1
+fi
 
-echo "⚙️ Making it executable..."
-chmod +x "./commitdev_temp"
+DOWNLOAD_URL="https://github.com/$REPO/releases/download/$VERSION/$ASSET_NAME"
 
-echo "🚀 Installing to $TARGET_DIR (requires sudo)..."
-sudo mv "./commitdev_temp" "$TARGET_DIR/$BINARY_NAME"
+echo "📥 Downloading $ASSET_NAME from GitHub Releases..."
+curl -L -f "$DOWNLOAD_URL" -o "/tmp/$BINARY_NAME"
 
-echo "✨ Installation complete! Run '$BINARY_NAME --help' to test."
+echo "⚙️ Installing binary to $TARGET_DIR (requires sudo access)..."
+sudo mv "/tmp/$BINARY_NAME" "$TARGET_DIR/$BINARY_NAME"
+sudo chmod +x "$TARGET_DIR/$BINARY_NAME"
+
+echo "⚡ Running app configuration initialization..."
+# Run the internal app configuration you built earlier
+$BINARY_NAME setup
+
+echo "✨ Installation complete! You can now use the '$BINARY_NAME' command globally."
