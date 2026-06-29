@@ -3,7 +3,7 @@ set -e
 
 # Configuration
 REPO="WaleX-projects/commitdev-cli"
-VERSION="v1.0.4"
+VERSION="v1.0.5"
 BINARY_NAME="commitdev"
 TARGET_DIR="/usr/local/bin"
 
