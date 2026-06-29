@@ -37,7 +37,7 @@ def setup():
     
     # 2. Extract internal paths
     bundle_dir = get_bundle_path()
-    template_path = bundle_dir / "hooks" / "pre-push"
+    template_path = bundle_dir /"commitdev" / "hooks" / "pre-push"
     target_path = global_hooks_dir / "pre-push"
     
     if not template_path.exists():
