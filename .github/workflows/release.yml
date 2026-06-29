@@ -51,7 +51,7 @@ jobs:
         files: |
           dist/${{ matrix.asset_name }}
           install.sh
-          uninstall.sh
+          
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         
