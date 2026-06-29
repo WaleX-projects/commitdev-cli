@@ -19,5 +19,5 @@ COMMIT_MSG=$(git log -1 --pretty=%B)
 if [[ "${COMMIT_MSG,,}" == *"[draft]"* ]]; then
     # Professional inline notification that clears up or logs cleanly
     echo -e "  ${EMERALD}✓${RESET} ${BOLD}${EMERALD}commitdev${RESET} ${DIM}•${RESET} '[draft]' flag recognized. Spawning background watch cycle..."
-    commitdev watch
+    commitdev listen-for-drafts
 fi

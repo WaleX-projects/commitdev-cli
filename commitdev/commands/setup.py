@@ -63,12 +63,12 @@ def setup():
         console.print("[success]✓[/success] Background synchronization engine activated successfully\n")
         
         # Next Steps block matching the premium layout profile
-        console.print("[white]Next Steps[/white]")
+        console.print("\n[white]Next Steps[/white]")
         console.print("  [meta]›[/meta] Move into an active repository workspace:")
         console.print("    [command]cd[/command] [meta]path/to/your/project[/meta]")
-        console.print("  [meta]›[/meta] Run verification tracking sequence:")
-        console.print("    [brand]commitdev watch[/brand]\n")
-        
+        console.print("  [meta]›[/meta] Run the login command:")
+        console.print("    [brand]commitdev login[/brand]\n")
+                
     except subprocess.CalledProcessError:
         console.print("  [error]✕ Error:[/error] Core system rejected global git hook updates.")
         raise typer.Exit(code=1)
