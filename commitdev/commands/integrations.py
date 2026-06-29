@@ -1,5 +1,19 @@
+import typer
+from rich.console import Console
+from rich.theme import Theme
 from commitdev.api import get
 
+# Official CommitDev styling engine matching your custom UI
+commitdev_theme = Theme({
+    "brand": "bold spring_green3",   # Primary mint/emerald color signature
+    "success": "spring_green3",
+    "meta": "dim grey39",            # Secondary layout accent gray 
+    "command": "bold white",
+    "error": "bold red",
+    "warn": "bold yellow"
+})
+
+console = Console(theme=commitdev_theme, highlight=False)
 
 def integrations():
     """
@@ -7,44 +21,35 @@ def integrations():
 
     Lists every supported publishing platform and indicates
     whether it is connected to your CommitDev account.
-    Use this command to verify which channels are available
-    for publishing your generated posts.
     """
+    console.print("\n[brand]CommitDev[/brand] [meta]•[/meta] Connected Integrations")
+    console.print("[meta]──────────────────────────────────────────────────[/meta]")
 
-    try:
+    with console.status("[meta]Fetching configuration maps from account profile...[/meta]", spinner="simpleDots"):
+        try:
+            data = get("/cli/integrations/")
+        except Exception as e:
+            console.print(f"  [error]✕ Failed to fetch integrations:[/error] [meta]{e}[/meta]\n")
+            return
 
-        data = get("/cli/integrations/")
+    connected_count = 0
 
-        print("\n🔗 Integrations")
-        print("─" * 40)
+    for platform, details in data.items():
+        connected = details.get("connected", False)
 
-        connected_count = 0
+        if connected:
+            connected_count += 1
+            status_indicator = "[success]✓ Connected[/success]"
+            bullet = "[success]›[/success]"
+        else:
+            status_indicator = "[meta]✕ Not Connected[/meta]"
+            bullet = "[meta]›[/meta]"
 
-        for platform, details in data.items():
-
-            connected = details.get("connected", False)
-
-            if connected:
-                connected_count += 1
-
-            status = (
-                "✅ Connected"
-                if connected
-                else "❌ Not Connected"
-            )
-
-            print(
-                f"{platform.capitalize():<15} {status}"
-            )
-
-        print("─" * 40)
-        print(
-            f"Connected: {connected_count}/{len(data)}"
+        console.print(
+            f"  {bullet} [white]{platform.capitalize():<15}[/white] [meta]───[/meta] {status_indicator}"
         )
 
-        print()
-
-    except Exception as e:
-
-        print("\n❌ Failed to fetch integrations")
-        print(f"   {e}\n")
+    console.print("[meta]──────────────────────────────────────────────────[/meta]")
+    
+    # Summary line tracking total links active
+    console.print(f"Active Channels [meta]›[/meta] [success]{connected_count}[/success] [meta]/ {len(data)} configured[/meta]\n")

@@ -1,6 +1,12 @@
 #!/bin/bash
 
-# 1. RUN LOCAL HOOKS FIRST
+# CommitDev Color Codes matching your dashboard identity
+BOLD='\033[1m'
+EMERALD='\033;5;48m' # Signature mint/emerald color
+DIM='\033[2m'          # Dark slate grey text
+RESET='\033[0m'
+
+# 1. RUN LOCAL HOOKS FIRST (Preserve native developer workflows)
 if [ -f "./.git/hooks/pre-push.local" ]; then
     "./.git/hooks/pre-push.local" "$@"
 elif [ -f "./.git/hooks/pre-push" ] && [ ! -L "./.git/hooks/pre-push" ]; then
@@ -11,6 +17,7 @@ fi
 COMMIT_MSG=$(git log -1 --pretty=%B)
 
 if [[ "${COMMIT_MSG,,}" == *"[draft]"* ]]; then
-    echo "🔄 [commitdev] '[draft]' tag detected. Launching agent watch..."
+    # Professional inline notification that clears up or logs cleanly
+    echo -e "  ${EMERALD}✓${RESET} ${BOLD}${EMERALD}commitdev${RESET} ${DIM}•${RESET} '[draft]' flag recognized. Spawning background watch cycle..."
     commitdev watch
 fi

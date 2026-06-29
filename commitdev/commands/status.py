@@ -1,4 +1,19 @@
+import typer
+from rich.console import Console
+from rich.theme import Theme
 from commitdev.api import get
+
+# Official CommitDev styling engine matching your custom UI
+commitdev_theme = Theme({
+    "brand": "bold spring_green3",   # Primary mint/emerald color signature
+    "success": "spring_green3",
+    "meta": "dim grey39",            # Secondary layout accent gray 
+    "command": "bold white",
+    "error": "bold red",
+    "warn": "bold yellow"
+})
+
+console = Console(theme=commitdev_theme, highlight=False)
 
 
 def status():
@@ -7,63 +22,56 @@ def status():
 
     Displays the latest repository, commit, overall publishing status,
     commit SHA, and the delivery status for every connected platform.
-    Useful for checking whether a post was successfully published,
-    is still pending, or failed.
     """
-    try:
-        # Fetch the updated data from your CLIStatusView endpoint
-        data = get("/cli/status/")
+    console.print("\n[brand]CommitDev[/brand] [meta]•[/meta] Pipeline Status")
+    console.print("[meta]──────────────────────────────────────────────────[/meta]")
 
-        if data.get("status") == "no_posts":
-            print("\n📊 No deployment history found for this account.\n")
+    with console.status("[meta]Loading latest deployment parameters...[/meta]", spinner="simpleDots"):
+        try:
+            data = get("/cli/status/")
+        except Exception as e:
+            console.print(f"  [error]✕ Status retrieval aborted:[/error] [meta]{e}[/meta]\n")
             return
 
-        print("\n📦 CommitDev Status")
-        print("─" * 60)
+    if data.get("status") == "no_posts":
+        console.print("  [meta]- No deployment history found for this account[/meta]\n")
+        return
 
-        # 1. Print core commit details
-        sha_suffix = f" ({data.get('commit_sha')})" if data.get('commit_sha') else ""
-        print(f"Repository  : {data.get('repository', '-')}{sha_suffix}")
-        print(f"Last Commit : {data.get('last_commit', '-')}")
-        print(f"Overall     : {data.get('overall_status', '-').upper()}")
-        print("─" * 60)
-        
-        # 2. Loop through and display each individual social media platform
-        print("Platform Deliveries:")
-        platforms_list = data.get("platforms", [])
+    sha_suffix = f" [meta]({data.get('commit_sha')})[/meta]" if data.get('commit_sha') else ""
+    console.print(f"Repository   [meta]›[/meta] [white]{data.get('repository', '-')}[/white]{sha_suffix}")
+    console.print(f"Last Commit  [meta]›[/meta] {data.get('last_commit', '-')}")
+    
+    overall = data.get('overall_status', '-').upper()
+    overall_style = "success" if overall in ["POSTED", "PUBLISHED", "SUCCESS"] else "error" if overall == "FAILED" else "warn"
+    console.print(f"Pipeline     [meta]›[/meta] [{overall_style}]{overall}[/{overall_style}]")
+    console.print("[meta]──────────────────────────────────────────────────[/meta]")
+    
+    console.print("[white]Platform Deliveries[/white]")
+    platforms_list = data.get("platforms", [])
 
-        if not platforms_list:
-            print("  ➖ No targeted platforms linked to this post.")
-        else:
-            for p in platforms_list:
-                provider = p.get("provider", "-")
-                delivery_status = p.get("delivery_status", "-")
-                username = p.get("username", "")
-                
-                # Format username cleanly if it exists
-                user_str = f" ({username})" if username else ""
-                
-                # Match status to custom styling icons
-                if delivery_status == "published":
-                    icon = "✅"
-                elif delivery_status == "failed":
-                    icon = "❌"
-                else:
-                    icon = "⏳" # For "pending" status
+    if not platforms_list:
+        console.print("  [meta]- No target delivery nodes linked to this push[/meta]")
+    else:
+        for p in platforms_list:
+            provider = p.get("provider", "-")
+            delivery_status = p.get("delivery_status", "-")
+            username = p.get("username", "")
+            
+            user_str = f" [meta]({username})[/meta]" if username else ""
+            
+            if delivery_status in ["published", "posted"]:
+                status_indicator = "[success]✓[/success]"
+            elif delivery_status == "failed":
+                status_indicator = "[error]✕[/error]"
+            else:
+                status_indicator = "[warn]•[/warn]"
 
-                print(f"  {icon} [{provider}]{user_str} ─── Status: {delivery_status}")
-                
-                # If there's a specific error message, show it underneath
-                if p.get("error_message"):
-                    print(f"     ↳ Error: {p['error_message']}")
+            console.print(f"  {status_indicator} [white]{provider}[/white]{user_str} [meta]──[/meta] {delivery_status}")
+            
+            if p.get("error_message"):
+                console.print(f"     [error]↳ Error:[/error] [meta]{p['error_message']}[/meta]")
 
-        print("─" * 60 + "\n")
-
-    except Exception as e:
-        print(f"\n❌ Failed to fetch status")
-        print(f"   {e}\n")
-
-
+    console.print("[meta]──────────────────────────────────────────────────[/meta]\n")
 
 
 def activity():
@@ -74,118 +82,40 @@ def activity():
     including the repository, commit message, commit SHA,
     overall status, and delivery status for each platform.
     """
-    try:
-        activities = get("/cli/activity/")
+    console.print("\n[brand]CommitDev[/brand] [meta]•[/meta] Recent Activity")
+    console.print("[meta]──────────────────────────────────────────────────[/meta]")
 
-        print("\n📜 Recent Activity")
-        print("─" * 60)
-
-        if not activities:
-            print("No recent activity\n")
+    with console.status("[meta]Loading pipeline activity timeline...[/meta]", spinner="simpleDots"):
+        try:
+            activities = get("/cli/activity/")
+        except Exception as e:
+            console.print(f"  [error]✕ Activity stream aborted:[/error] [meta]{e}[/meta]\n")
             return
 
-        for act in activities:
-            repo = act.get("repository", "-")
-            status = act.get("overall_status", "draft").upper()
-            commit = act.get("commit_message", "-")
-            sha = act.get("commit_sha", "-------")
+    if not activities:
+        console.print("  [meta]- No historic logs found for active repository context[/meta]\n")
+        return
 
-            # Match overall status to clean terminal colors/indicators
-            if status == "POSTED":
-                status_tag = f"✅ POSTED"
-            elif status == "FAILED":
-                status_tag = f"❌ FAILED"
-            else:
-                status_tag = f"⏳ {status}"
+    for act in activities:
+        repo = act.get("repository", "-")
+        status = act.get("overall_status", "draft").upper()
+        commit = act.get("commit_message", "-")
+        sha = act.get("commit_sha", "-------")
 
-            # 1. Gather all individual platforms targeted for this commit row
-            platform_tags = []
-            for p in act.get("platforms", []):
-                p_provider = p.get("provider", "")
-                p_status = p.get("status", "")
-                
-                # Small micro-indicator icon for individual channels
-                p_icon = "✓" if p_status == "published" else "𐄂" if p_status == "failed" else "•"
-                platform_tags.append(f"{p_provider}{p_icon}")
-            
-            platforms_str = f" [{', '.join(platform_tags)}]" if platform_tags else ""
+        status_style = "success" if status == "POSTED" else "error" if status == "FAILED" else "warn"
+        status_tag = f"[{status_style}]{status}[/{status_style}]"
 
-            # 2. Render a clean, legible activity line
-            print(f"• [{status_tag}{platforms_str}] {repo} ({sha})")
-            print(f"  ↳ {commit.strip()}")
-            print("─" * 60)
-
-        print()
-
-    except Exception as e:
-        print(f"\n❌ Failed to fetch activity")
-        print(f"   {e}\n")
-
-
-
-
-
-def doctor():
-    """
-    Diagnose your CommitDev installation.
-
-    Verifies that you are authenticated, GitHub is connected,
-    repositories are available, publishing channels are configured,
-    access tokens are valid, and your account is ready to publish.
-    Run this command whenever something isn't working as expected.
-    """
-    try:
-        data = get("/cli/doctor/")
-
-        print("\n🩺 CommitDev Doctor")
-        print("─" * 40)
-
-        # Core Credentials Layout Tracking
-        api_status = data["api"]["status"].upper()
-        authenticated = "✅ YES" if data["user"]["authenticated"] else "❌ NO"
-        github_connected = "✅ CONNECTED" if data["github"]["connected"] else "❌ NOT CONNECTED"
-
-        print(f"API            : ✅ {api_status}")
-        print(f"Authenticated  : {authenticated}")
-        print(f"User           : {data['user']['username']}")
-        print(f"GitHub         : {github_connected}")
-
-        print("\nRepositories")
-        print(f"  Total        : {data['repositories']['total']}")
-        print(f"  Active       : {data['repositories']['active']}")
-
-        print("\nPosts")
-        print(f"  Drafts       : {data['posts']['drafts']}")
-        print(f"  Published    : {data['posts']['published']}")
-
-        # New Distribution Integrations Deep Check
-        print("\nIntegrations")
-        integrations = data["integrations"]
-        providers = integrations["connected_providers"]
+        platform_tags = []
+        for p in act.get("platforms", []):
+            p_provider = p.get("provider", "")
+            p_status = p.get("status", "")
+            p_style = "success" if p_status == "published" else "error" if p_status == "failed" else "meta"
+            platform_tags.append(f"[{p_style}]{p_provider}[/{p_style}]")
         
-        if not integrations["has_targets"]:
-            print("  Status       : ⚠️ NO SOCIAL CHANNELS LINKED (Run web setup)")
-        else:
-            print(f"  Channels     : ✅ LINKED ({', '.join(providers)})")
-            
-        if integrations["expired_tokens"] > 0:
-            print(f"  Token Health : ❌ {integrations['expired_tokens']} RE-AUTH REQUIRED")
-        else:
-            print("  Token Health : ✅ ALL TOKENS VALID")
+        platforms_str = f" [meta]•[/meta] {', '.join(platform_tags)}" if platform_tags else ""
 
-        print("─" * 40)
+        console.print(f"  [meta]›[/meta] {status_tag} [white]{repo}[/white] [meta]({sha})[/meta]{platforms_str}")
+        console.print(f"    [meta]↳ {commit.strip()}[/meta]")
+        console.print("[meta]──────────────────────────────────────────────────[/meta]")
 
-        # Comprehensive Final Health Evaluation
-        if (
-            data["user"]["authenticated"]
-            and data["github"]["connected"]
-            and integrations["has_targets"]
-            and integrations["expired_tokens"] == 0
-        ):
-            print("🎉 Everything looks good. Ready to push code!\n")
-        else:
-            print("⚠️ Action required. Some validation checks failed.\n")
-
-    except Exception as e:
-        print("\n❌ Doctor check failed")
-        print(f"   {e}\n")
+    console.print()

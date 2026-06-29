@@ -3,34 +3,43 @@ set -e
 
 # Configuration
 REPO="WaleX-projects/commitdev-cli"
-VERSION="v1.0.4" # Or use "latest" to dynamically grab the newest version later
+VERSION="v1.0.4"
 BINARY_NAME="commitdev"
 TARGET_DIR="/usr/local/bin"
 
-echo "🚀 Starting commitdev installer..."
+# CommitDev Color System from Screenshot_2026-06-29-14-47-05-440_com.android.chrome.jpg
+BOLD='\033[1m'
+EMERALD='\033[38;5;48m' # Rich mint/emerald brand color
+GREEN='\033[32m'
+DIM='\033[2m'           # Secondary slate grey hints
+RESET='\033[0m'
 
-# 1. Detect Operating System architecture
+echo ""
+echo "${BOLD}${EMERALD}CommitDev${RESET} ${DIM}•${RESET} Installer"
+echo "${DIM}──────────────────────────────────────────────────${RESET}"
+
+# Operating System detection block
 OS_TYPE=$(uname -s)
 if [ "$OS_TYPE" = "Linux" ]; then
     ASSET_NAME="commitdev-linux"
 elif [ "$OS_TYPE" = "Darwin" ]; then
     ASSET_NAME="commitdev-macos"
 else
-    echo "❌ Error: This install script only supports Linux and macOS. For Windows, download commitdev-windows.exe directly from GitHub Releases."
+    echo "  ${DIM}✕ Error:${RESET} This install script only supports Linux and macOS."
     exit 1
 fi
 
 DOWNLOAD_URL="https://github.com/$REPO/releases/download/$VERSION/$ASSET_NAME"
 
-echo "📥 Downloading $ASSET_NAME from GitHub Releases..."
-curl -L -f "$DOWNLOAD_URL" -o "/tmp/$BINARY_NAME"
+echo "  ${DIM}›${RESET} Downloading platform asset: ${BOLD}$ASSET_NAME${RESET}"
+curl -L -s -f "$DOWNLOAD_URL" -o "/tmp/$BINARY_NAME"
 
-echo "⚙️ Installing binary to $TARGET_DIR (requires sudo access)..."
+echo "  ${DIM}›${RESET} Moving binary to $TARGET_DIR ${DIM}(requires system privileges)${RESET}"
 sudo mv "/tmp/$BINARY_NAME" "$TARGET_DIR/$BINARY_NAME"
 sudo chmod +x "$TARGET_DIR/$BINARY_NAME"
 
-echo "⚡ Running app configuration initialization..."
-# Run the internal app configuration you built earlier
-$BINARY_NAME setup
+echo "  ${EMERALD}✓${RESET} Binary installed globally successfully"
+echo ""
 
-echo "✨ Installation complete! You can now use the '$BINARY_NAME' command globally."
+echo "${BOLD}Initializing CLI Workspace:${RESET}"
+$BINARY_NAME setup

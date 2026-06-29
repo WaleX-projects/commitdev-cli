@@ -10,7 +10,7 @@ from commitdev.commands.auth import (
 from commitdev.commands.status import (
     status,
     activity,
-    doctor,
+    
 )
 
 from commitdev.commands.drafts import (
