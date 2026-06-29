@@ -1,0 +1,11 @@
+[project]
+name = "commitdev"
+version = "0.1.0"
+description = "CommitDev CLI"
+dependencies = [
+    "typer",
+    "requests"
+]
+
+[project.scripts]
+commitdev = "commitdev.main:app"

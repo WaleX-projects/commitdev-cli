@@ -1,0 +1,16 @@
+#!/bin/bash
+
+# 1. RUN LOCAL HOOKS FIRST
+if [ -f "./.git/hooks/pre-push.local" ]; then
+    "./.git/hooks/pre-push.local" "$@"
+elif [ -f "./.git/hooks/pre-push" ] && [ ! -L "./.git/hooks/pre-push" ]; then
+    "./.git/hooks/pre-push" "$@"
+fi
+
+# 2. RUN COMMITDEV LOGIC
+COMMIT_MSG=$(git log -1 --pretty=%B)
+
+if [[ "${COMMIT_MSG,,}" == *"[draft]"* ]]; then
+    echo "🔄 [commitdev] '[draft]' tag detected. Launching agent watch..."
+    commitdev watch
+fi

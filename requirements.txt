@@ -1,0 +1,5 @@
+typer==0.26.4
+requests==2.34.2
+websockets==16.0
+python-dotenv==1.2.2
+pyinstaller==6.21.0

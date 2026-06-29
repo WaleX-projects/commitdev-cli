@@ -1,0 +1,18 @@
+# Virtual Environment
+venv/
+.venv/
+env/
+
+# PyInstaller / Build outputs
+build/
+dist/
+*.spec
+
+# Python metadata and caches
+__pycache__/
+*.pyc
+*.egg-info/
+.eggs/
+
+# OS specific files
+.DS_Store
