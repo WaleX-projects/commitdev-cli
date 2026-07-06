@@ -230,5 +230,5 @@ def uninstall():
 
 
 if __name__ == "__main__":
-    print("finish test 1244748488")
+    print("finish test 1244748488heheh")
     app()
