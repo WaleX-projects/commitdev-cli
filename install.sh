@@ -3,7 +3,7 @@ set -e
 
 # Configuration
 REPO="WaleX-projects/commitdev-cli"
-VERSION="v1.0.y"
+VERSION="v1.1.3"
 BINARY_NAME="commitdev"
 TARGET_DIR="/usr/local/bin"
 
@@ -29,7 +29,7 @@ else
     exit 1
 fi
 
-DOWNLOAD_URL="https://github.com/WaleX-projects/commitDev/releases/download/v1.1.3/commitdev"
+DOWNLOAD_URL="https://github.com/$REPO/releases/download/$VERSION/$ASSET_NAME"
 
 echo "  ${DIM}›${RESET} Downloading platform asset: ${BOLD}$ASSET_NAME${RESET}"
 curl -L -s -f "$DOWNLOAD_URL" -o "/tmp/$BINARY_NAME"
