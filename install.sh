@@ -3,15 +3,13 @@ set -e
 
 # Configuration
 REPO="WaleX-projects/commitdev-cli"
-VERSION="v1.1.3"
 BINARY_NAME="commitdev"
 TARGET_DIR="/usr/local/bin"
 
-# CommitDev Color System from Screenshot_2026-06-29-14-47-05-440_com.android.chrome.jpg
+# CommitDev Color System
 BOLD='\033[1m'
-EMERALD='\033[38;5;48m' # Rich mint/emerald brand color
-GREEN='\033[32m'
-DIM='\033[2m'           # Secondary slate grey hints
+EMERALD='\033[38;5;48m' 
+DIM='\033[2m'           
 RESET='\033[0m'
 
 echo ""
@@ -29,10 +27,26 @@ else
     exit 1
 fi
 
-DOWNLOAD_URL="https://github.com/$REPO/releases/download/$VERSION/$ASSET_NAME"
+# ─── SMART VERSION DETECTION ───
+# Hits GitHub's API to find your latest published release tag automatically
+echo "  ${DIM}›${RESET} Checking latest release version..."
+VERSION=$(curl -s "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+
+if [ -z "$VERSION" ]; then
+    echo "  ${DIM}✕ Error:${RESET} Could not resolve latest release version. Falling back to API redirect..."
+    DOWNLOAD_URL="https://github.com/$REPO/releases/latest/download/$ASSET_NAME"
+else
+    echo "  ${DIM}›${RESET} Found active release: ${BOLD}$VERSION${RESET}"
+    DOWNLOAD_URL="https://github.com/$REPO/releases/download/$VERSION/$ASSET_NAME"
+fi
 
 echo "  ${DIM}›${RESET} Downloading platform asset: ${BOLD}$ASSET_NAME${RESET}"
-curl -L -s -f "$DOWNLOAD_URL" -o "/tmp/$BINARY_NAME"
+# Download to /tmp safely
+curl -L -f "$DOWNLOAD_URL" -o "/tmp/$BINARY_NAME" || {
+    echo "  ${DIM}✕ Error:${RESET} Failed to download binary asset from $DOWNLOAD_URL."
+    echo "            Ensure your GitHub Actions workflow finished and uploaded the asset."
+    exit 1
+}
 
 echo "  ${DIM}›${RESET} Moving binary to $TARGET_DIR ${DIM}(requires system privileges)${RESET}"
 sudo mv "/tmp/$BINARY_NAME" "$TARGET_DIR/$BINARY_NAME"
@@ -42,4 +56,5 @@ echo "  ${EMERALD}✓${RESET} Binary installed globally successfully"
 echo ""
 
 echo "${BOLD}Initializing CLI Workspace:${RESET}"
-$BINARY_NAME setup
+# Execute with full path to prevent any shell hashing delay issues
+"$TARGET_DIR/$BINARY_NAME" setup
