@@ -52,4 +52,36 @@ jobs:
         name: ${{ matrix.asset_name }}
         path: dist/${{ matrix.asset_name }}
 
-  
+  # ─── THE MISSING BLOCK THAT CREATES YOUR RELEASE PAGE ───
+  release:
+    name: Create Production Release Page
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Grants permissions to generate release pages
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Download Compiled Assets
+      uses: actions/download-artifact@v4
+      with:
+        path: distribution_vault
+
+    - name: Flatten Production Directory Layout
+      run: |
+        mkdir -p dist_final
+        # Safely extracts the binaries out of their temporary multi-runner subdirectories
+        find distribution_vault -type f -exec mv {} dist_final/ \;
+        # Injects your helper install asset into the deployment payload folder
+        if [ -f "install.sh" ]; then cp install.sh dist_final/; fi
+
+    - name: Publish Automated GitHub Release Page
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        # Native GitHub CLI checks database syncs and creates the page smoothly.
+        gh release create "${{ github.ref_name }}" dist_final/* \
+          --title "Release ${{ github.ref_name }}" \
+          --notes "Automated distribution payload matrix compilation for CommitDev CLI ${{ github.ref_name }}." \
+          --clobber
