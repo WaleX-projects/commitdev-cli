@@ -90,7 +90,7 @@ git() {
         if [ $? -eq 0 ]; then
             if echo "$commit_msg" | grep -iq "\\[draft\\]"; then
                 echo -e "\\n\\033[1;35m📡 Code is safe on GitHub. Spinnaker/Daphne connection spinning up...\\033[0m"
-                commitdev monitor-stream
+                commitdev listen_for_drafts
             else
                 echo -e "\\n✅ Normal push complete."
             fi
