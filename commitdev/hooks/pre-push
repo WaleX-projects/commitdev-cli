@@ -1,32 +1,15 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-# CommitDev Color Codes matching your dashboard identity
-BOLD='\033[1m'
-EMERALD='\033[38;5;48m' # Signature mint/emerald color
-DIM='\033[2m'           # Dark slate grey text
-RESET='\033[0m'
+# Read the last commit message locally
+commit_msg=$(git log -1 --format=%s)
 
-# 1. RUN LOCAL HOOKS FIRST (Preserve native developer workflows)
-if [ -f "./.git/hooks/pre-push.local" ]; then
-    "./.git/hooks/pre-push.local" "$@"
-elif [ -f "./.git/hooks/pre-push" ] && [ ! -L "./.git/hooks/pre-push" ]; then
-    "./.git/hooks/pre-push" "$@"
+# Specifically look for [draft] (case-insensitive)
+if echo "$commit_msg" | grep -iq "\[draft\]"; then
+    echo -e ""
+    echo -e "\033[1;35m✨ Hey! CommitDev here.\033[0m"
+    echo -e "\033[1;36mI spotted your \033[1m[draft]\033[22m tag. We've locked onto this commit and armed your pipeline.\033[0m"
+    echo -e "\033[32mGo ahead and finish the push—I'll drop your live workspace right beneath it when it lands! 🚀\033[0m"
+    echo -e ""
 fi
 
-# 2. RUN COMMITDEV LOGIC
-COMMIT_MSG=$(git log -1 --pretty=%B)
-
-if [[ "${COMMIT_MSG,,}" == *"[draft]"* ]]; then
-    echo -e "  ${EMERALD}✓${RESET} ${BOLD}${EMERALD}commitdev${RESET} ${DIM}•${RESET} '[draft]' flag recognized. Spawning background watch cycle..."
-    
-    # ─── THE CRITICAL FIX ───
-    # Launch listen-for-drafts safely into a background daemon subshell.
-    # We redirect standard out/error to a log profile, and detach standard in via ampersand (&).
-    # This immediately yields runtime execution flow control straight back to Git!
-    
-    mkdir -p "$HOME/.config/commitdev"
-    nohup commitdev listen-for-drafts > "$HOME/.config/commitdev/agent.log" 2>&1 &
-    
-    # Give the background worker a fraction of a second to spin up safely before ending hook 
-    sleep 0.1
-fi
+exit 0
