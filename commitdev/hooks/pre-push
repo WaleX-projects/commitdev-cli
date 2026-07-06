@@ -2,8 +2,8 @@
 
 # CommitDev Color Codes matching your dashboard identity
 BOLD='\033[1m'
-EMERALD='\033;5;48m' # Signature mint/emerald color
-DIM='\033[2m'          # Dark slate grey text
+EMERALD='\033[38;5;48m' # Signature mint/emerald color
+DIM='\033[2m'           # Dark slate grey text
 RESET='\033[0m'
 
 # 1. RUN LOCAL HOOKS FIRST (Preserve native developer workflows)
@@ -17,7 +17,16 @@ fi
 COMMIT_MSG=$(git log -1 --pretty=%B)
 
 if [[ "${COMMIT_MSG,,}" == *"[draft]"* ]]; then
-    # Professional inline notification that clears up or logs cleanly
     echo -e "  ${EMERALD}✓${RESET} ${BOLD}${EMERALD}commitdev${RESET} ${DIM}•${RESET} '[draft]' flag recognized. Spawning background watch cycle..."
-    commitdev listen-for-drafts
+    
+    # ─── THE CRITICAL FIX ───
+    # Launch listen-for-drafts safely into a background daemon subshell.
+    # We redirect standard out/error to a log profile, and detach standard in via ampersand (&).
+    # This immediately yields runtime execution flow control straight back to Git!
+    
+    mkdir -p "$HOME/.config/commitdev"
+    nohup commitdev listen-for-drafts > "$HOME/.config/commitdev/agent.log" 2>&1 &
+    
+    # Give the background worker a fraction of a second to spin up safely before ending hook 
+    sleep 0.1
 fi
