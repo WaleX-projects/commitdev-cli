@@ -9,11 +9,6 @@ jobs:
   build:
     name: Build on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
-    
-    # FORCES GITHUB TO ALLOW CREATING AND WRITING RELEASES
-    permissions:
-      contents: write
-      
     strategy:
       matrix:
         include:
@@ -32,11 +27,13 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: '3.10'
+        cache: 'pip'
 
     - name: Install All Dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install pyinstaller typer requests websockets google-genai openai python-dotenv
+        # Included Pillow and rich-pixels so your inline image rendering system works natively
+        pip install pyinstaller typer requests websockets python-dotenv Pillow rich-pixels
 
     - name: Build Binary (Linux/macOS)
       if: matrix.os != 'windows-latest'
@@ -49,12 +46,42 @@ jobs:
       run: |
         pyinstaller --onefile --add-data "commitdev/hooks;commitdev/hooks" commitdev/main.py --name ${{ matrix.asset_name }}
 
-    - name: Upload to Release
-      uses: softprops/action-gh-release@v2
-      if: startsWith(github.ref, 'refs/tags/')
+    - name: Stage Artifact for Assembly
+      uses: actions/upload-artifact@v4
       with:
-        files: |
-          dist/${{ matrix.asset_name }}
-          install.sh
+        name: ${{ matrix.asset_name }}
+        path: dist/${{ matrix.asset_name }}
+
+  release:
+    name: Create Production Release Page
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Essential key allowing the native GH token to update release pages
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Download Compiled Assets
+      uses: actions/download-artifact@v4
+      with:
+        path: distribution_vault
+
+    - name: Flatten Production Directory Layout
+      run: |
+        mkdir -p dist_final
+        # Safely extracts the binaries out of their temporary multi-runner subdirectories
+        find distribution_vault -type f -exec mv {} dist_final/ \;
+        # Injects your helper install asset from your repo source into the deployment payload folder
+        if [ -f "install.sh" ]; then cp install.sh dist_final/; fi
+
+    - name: Publish Automated GitHub Release Page
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        # Native GitHub CLI checks database syncs and avoids parallel timing collisons.
+        # --clobber overwrites duplicate tracking files if you ever have to re-run the action.
+        gh release create "${{ github.ref_name }}" dist_final/* \
+          --title "Release ${{ github.ref_name }}" \
+          --notes "Automated distribution payload matrix compilation for CommitDev CLI ${{ github.ref_name }}." \
+          --clobber
