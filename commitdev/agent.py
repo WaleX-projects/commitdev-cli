@@ -6,6 +6,9 @@ import sys
 import tempfile
 import websockets
 from commitdev.config import get_token
+
+
+###
 # Fallback mechanism if get_token() logic needs refreshing or fails
 def fetch_fresh_token():
     try:
