@@ -6,7 +6,7 @@ import sys
 import tempfile
 import websockets
 from commitdev.config import get_token
-
+import time
 
 ###
 # Fallback mechanism if get_token() logic needs refreshing or fails
