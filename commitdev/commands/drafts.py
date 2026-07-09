@@ -1,19 +1,26 @@
+# ─── STANDARD LIBRARY IMPORTS ───────────────────────────────────────
 import asyncio
+import io
 import json
 import os
 import subprocess
 import sys
 import tempfile
 import time
+import urllib.request
 from pathlib import Path
-import websockets
-import typer
-from rich.console import Console
-from rich.theme import Theme
-from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
+from urllib.parse import urlparse
+
+# ─── THIRD PARTY IMPORTS ────────────────────────────────────────────
 from PIL import Image
+import typer
+import websockets
+from rich.console import Console
+from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn
+from rich.theme import Theme
 from rich_pixels import Pixels
 
+# ─── LOCAL INTERNAL CORE APP IMPORTS ───────────────────────────────
 from commitdev.api import get, post
 from commitdev.config import get_token
 
@@ -259,10 +266,13 @@ async def handle_publishing_pipeline(ws, payload):
                         "content": current_content
                     }))
                     await asyncio.sleep(0.5)
-                console.print("  [success]✓ Draft updated successfully on production server.[/success]")
+                console.print("  [success]✓ Draft updated successfully.[/success]")
             break
         else:
             break
+     # Assuming this is what's backing your Pixels engine
+
+
 
     # STAGE 5 — IMAGES LOOP
     while True:
@@ -273,46 +283,94 @@ async def handle_publishing_pipeline(ws, payload):
         if img_action == "Skip":
             break
             
-        console.print("\n[white]Drag & drop an image or enter image file path:[/white]")
+        console.print("\n[white]Drag & drop an image, enter file path, or paste an image URL:[/white]")
         path_input = input("> ").strip("'\" ")
-        img_path = Path(path_input)
         
-        if not img_path.is_file():
-            console.print("  [error]✕ Access error: Target file path does not exist on this machine.[/error]")
-            continue
-            
-        console.print(f"\n  [success]✓ {img_path.name} detected[/success]")
+        # Detect if input is a remote link
+        is_url = path_input.lower().startswith(("http://", "https://"))
+        img_bytes = None
+        img_name = ""
+        kb_size = 0.0
         
-        with Progress(SpinnerColumn(), BarColumn(bar_width=30), TextColumn("[progress.percentage]{task.percentage:>3.0f}%"), console=console) as progress:
-            task = progress.add_task("[meta]Uploading assets...[/meta]", total=100)
-            while not progress.finished:
-                await asyncio.sleep(0.02)
-                progress.update(task, advance=5)
+        if is_url:
+            try:
+                parsed = urlparse(path_input)
+                if not parsed.netloc:
+                    raise ValueError
+                img_name = parsed.path.split("/")[-1] or "remote_image.jpg"
+            except ValueError:
+                console.print("  [error]✕ Access error: Invalid URL format provided.[/error]")
+                continue
                 
+            console.print(f"\n  [success]✓ Remote asset target verified[/success]")
+            
+            # Use the progress bar to show actual download or dynamic processing stream
+            with Progress(SpinnerColumn(), BarColumn(bar_width=30), TextColumn("[progress.percentage]{task.percentage:>3.0f}%"), console=console) as progress:
+                task = progress.add_task("[meta]Downloading remote asset...[/meta]", total=100)
+                
+                try:
+                    # Fetch image data completely into an in-memory byte sequence
+                    req = urllib.request.Request(path_input, headers={'User-Agent': 'Mozilla/5.0'})
+                    with urllib.request.urlopen(req, timeout=10) as response:
+                        img_bytes = response.read()
+                    
+                    kb_size = len(img_bytes) / 1024
+                    
+                    # Smoothly animate the remaining loading slider progress bars
+                    while not progress.finished:
+                        await asyncio.sleep(0.01)
+                        progress.update(task, advance=10)
+                except Exception as e:
+                    progress.stop()
+                    console.print(f"  [error]✕ Network error: Could not fetch resource ({str(e)}).[/error]")
+                    continue
+        else:
+            # Handle standard local files exactly as before
+            img_path = Path(path_input)
+            if not img_path.is_file():
+                console.print("  [error]✕ Access error: Target file path does not exist on this machine.[/error]")
+                continue
+                
+            img_name = img_path.name
+            kb_size = img_path.stat().st_size / 1024
+            console.print(f"\n  [success]✓ {img_name} detected[/success]")
+            
+            with Progress(SpinnerColumn(), BarColumn(bar_width=30), TextColumn("[progress.percentage]{task.percentage:>3.0f}%"), console=console) as progress:
+                task = progress.add_task("[meta]Uploading local assets...[/meta]", total=100)
+                while not progress.finished:
+                    await asyncio.sleep(0.02)
+                    progress.update(task, advance=5)
+
         # STAGE 6 — IMAGE PREVIEW RENDERER
         console.print("\n[meta]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/meta]")
         console.print("  [white]Attached Image Data Frame[/white]")
         
         try:
-            with Image.open(img_path) as img:
+            # Open source target: Either from downloaded bytes buffer OR local Path object
+            img_source = io.BytesIO(img_bytes) if is_url else img_path
+            
+            with Image.open(img_source) as img:
                 w, h = img.size
-                kb_size = img_path.stat().st_size / 1024
-                
                 aspect = h / w
                 target_w = 40
                 target_h = int((target_w * aspect) * 0.5)
                 resized = img.resize((target_w, max(1, target_h)))
-                pixels_frame = Pixels.from_image(resized)
                 
+                pixels_frame = Pixels.from_image(resized)
                 console.print(pixels_frame)
-                console.print(f"  [white]{img_path.name}[/white] [meta]•[/meta] {w}×{h} [meta]•[/meta] {kb_size:.1f} KB")
+                
+                # Dynamic metadata footer output
+                source_lbl = "[cyan]remote[/cyan]" if is_url else "[yellow]local[/yellow]"
+                console.print(f"  [white]{img_name}[/white] [meta]•[/meta] {source_lbl} [meta]•[/meta] {w}×{h} [meta]•[/meta] {kb_size:.1f} KB")
         except Exception:
-            w, h = 1920, 1080
-            kb_size = img_path.stat().st_size / 1024
-            console.print(f"  [white]{img_path.name}[/white]\n  [meta]{w}×{h} • {kb_size:.1f} KB[/meta]")
+            w, h = (1920, 1080) if is_url else (1920, 1080) # fallback assumptions
+            console.print(f"  [white]{img_name}[/white]\n  [meta]{w}×{h} • {kb_size:.1f} KB[/meta]")
             
         console.print("[meta]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/meta]")
-        attached_images.append(img_path)
+        
+        # Append target cleanly to payload references queue
+        attached_images.append(path_input if is_url else img_path)
+
 
     # STAGE 8 — FINAL REVIEW PROFILE SUMMARY
     console.print("\n[white]Draft Deployment Summary[/white]")
