@@ -52,8 +52,8 @@ def setup():
 # Read the last commit message locally
 commit_msg=$(git log -1 --format=%s)
 
-# Specifically look for [draft] or post (case-insensitive)
-if echo "$commit_msg" | grep -iq "\\[draft\\]"; then
+# Specifically look for [push] or post (case-insensitive)
+if echo "$commit_msg" | grep -iq "\\[post\\]"; then
     echo -e ""
     echo -e "\\033[1;35m✨ Hey! CommitDev here.\\033[0m"
     echo -e "\\033[1;36mI spotted your \\033[1m[draft]\\033[22m tag. We've locked onto this commit and armed your pipeline.\\033[0m"
@@ -88,9 +88,9 @@ git() {
         # 1. Run the native git push
         command git "$@"
         
-        # 2. Check explicitly for [draft] right after upload completes
+        # 2. Check explicitly for [post] right after upload completes
         if [ $? -eq 0 ]; then
-            if echo "$commit_msg" | grep -iq "\\[draft\\]"; then
+            if echo "$commit_msg" | grep -iq "\\[post\\]"; then
                 echo -e "\\n\\033[1;35m📡 Code is safe on GitHub. Spinnaker/Daphne connection spinning up...\\033[0m"
                 commitdev listen-for-drafts
             else
