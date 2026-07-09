@@ -243,9 +243,9 @@ def uninstall():
     if sys.platform == "win32":
         console.print("  [meta]ℹ Note: To fully remove the app binary, erase cdv-windows.exe or cdv.exe from your PATH environment locations.[/meta]\n")
     elif sys.platform == "darwin":
-        console.print("  [meta]ℹ Note: To fully remove the executable asset binary, run: sudo rm /usr/local/bin/cdv-macos[/meta]\n")
+        console.print("  [meta]ℹ Note: To fully remove the executable asset binary, run: sudo rm /usr/local/bin/commitdev[/meta]\n")
     else:
-        console.print("  [meta]ℹ Note: To fully remove the executable asset binary, run: sudo rm /usr/local/bin/cdv-linux[/meta]\n")
+        console.print("  [meta]ℹ Note: To fully remove the executable asset binary, run: sudo rm /usr/local/bin/commitdev[/meta]\n")
 
 
 if __name__ == "__main__":
