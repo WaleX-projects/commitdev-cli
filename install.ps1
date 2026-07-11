@@ -1,109 +1,190 @@
-$ErrorActionPreference = "Stop"
-
-# ==========================================
-# Configuration
-# ==========================================
+# ==================================================
+# CommitDev Installer
+# ==================================================
 
 $Repo = "WaleX-projects/commitdev-cli"
 $BinaryName = "commitdev.exe"
-$AssetName = "commitdev-windows.exe"
 
-$InstallDirectory = Join-Path $env:LOCALAPPDATA "CommitDev"
-$BinaryPath = Join-Path $InstallDirectory $BinaryName
+$InstallDir = Join-Path $env:LOCALAPPDATA "CommitDev"
+$BinaryPath = Join-Path $InstallDir $BinaryName
+$TempFile = Join-Path $env:TEMP $BinaryName
 
 Write-Host ""
 Write-Host "CommitDev • Installer" -ForegroundColor Green
 Write-Host "──────────────────────────────────────────────────"
 
-# ==========================================
-# Get Latest Release
-# ==========================================
+# ==================================================
+# Detect Platform
+# ==================================================
 
-Write-Host "  › Checking latest release..."
+Write-Host ""
+Write-Host "• Detecting platform..."
+
+Write-Host "  ✓ Windows" -ForegroundColor Green
+
+# ==================================================
+# Check Existing Installation
+# ==================================================
+
+Write-Host ""
+Write-Host "• Checking existing installation..."
+
+$CurrentVersion = $null
+
+if (Test-Path $BinaryPath) {
+
+    try {
+
+        $VersionOutput = & $BinaryPath --version
+
+        if ($VersionOutput -match "v?(\d+\.\d+\.\d+)") {
+            $CurrentVersion = "v$($Matches[1])"
+            Write-Host "  ✓ Found CommitDev $CurrentVersion" -ForegroundColor Green
+        }
+        else {
+            Write-Host "  › Existing installation detected."
+        }
+
+    }
+    catch {
+        Write-Host "  › Existing installation detected."
+    }
+
+}
+else {
+
+    Write-Host "  › CommitDev is not installed."
+
+}
+
+# ==================================================
+# Latest Release
+# ==================================================
+
+Write-Host ""
+Write-Host "• Checking latest release..."
 
 try {
+
     $Release = Invoke-RestMethod "https://api.github.com/repos/$Repo/releases/latest"
-    $Version = $Release.tag_name
+    $LatestVersion = $Release.tag_name
 
-    Write-Host "  › Found release $Version"
-
-    $DownloadUrl = "https://github.com/$Repo/releases/download/$Version/$AssetName"
 }
 catch {
-    Write-Host ""
-    Write-Host "✕ Failed to retrieve the latest release." -ForegroundColor Red
+
+    Write-Host "  ✕ Failed to determine the latest release." -ForegroundColor Red
     exit 1
+
 }
 
-# ==========================================
-# Create Install Directory
-# ==========================================
+Write-Host "  ✓ $LatestVersion" -ForegroundColor Green
 
-if (!(Test-Path $InstallDirectory)) {
-    Write-Host "  › Creating installation directory..."
-    New-Item -ItemType Directory -Path $InstallDirectory | Out-Null
+# ==================================================
+# Already Up To Date?
+# ==================================================
+
+if ($CurrentVersion -eq $LatestVersion) {
+
+    Write-Host ""
+    Write-Host "──────────────────────────────────────────────────"
+    Write-Host "✓ You're already running the latest version." -ForegroundColor Green
+    exit 0
+
 }
 
-# ==========================================
-# Download Binary
-# ==========================================
+# ==================================================
+# Download
+# ==================================================
 
-Write-Host "  › Downloading CommitDev..."
+Write-Host ""
+
+if ($CurrentVersion) {
+    Write-Host "• Updating CommitDev..."
+}
+else {
+    Write-Host "• Installing CommitDev..."
+}
+
+Write-Host "  › Downloading release..."
+
+$DownloadUrl = "https://github.com/$Repo/releases/download/$LatestVersion/commitdev-windows.exe"
 
 try {
+
     Invoke-WebRequest `
         -Uri $DownloadUrl `
-        -OutFile $BinaryPath
+        -OutFile $TempFile
+
 }
 catch {
-    Write-Host ""
-    Write-Host "✕ Failed to download CommitDev." -ForegroundColor Red
+
+    Write-Host "  ✕ Failed to download CommitDev." -ForegroundColor Red
     exit 1
+
 }
 
-# ==========================================
-# Add To PATH
-# ==========================================
+Write-Host "  ✓ Download complete." -ForegroundColor Green
 
-Write-Host "  › Checking PATH..."
+# ==================================================
+# Install
+# ==================================================
+
+Write-Host "  › Installing executable..."
+
+if (!(Test-Path $InstallDir)) {
+    New-Item `
+        -ItemType Directory `
+        -Path $InstallDir | Out-Null
+}
+
+Move-Item `
+    -Force `
+    $TempFile `
+    $BinaryPath
+
+Write-Host "  ✓ Installed to $BinaryPath" -ForegroundColor Green
+
+# ==================================================
+# Add To PATH
+# ==================================================
 
 $UserPath = [Environment]::GetEnvironmentVariable("Path", "User")
 
-if ($UserPath -notlike "*$InstallDirectory*") {
+if ($UserPath -notlike "*$InstallDir*") {
 
     [Environment]::SetEnvironmentVariable(
         "Path",
-        "$UserPath;$InstallDirectory",
+        "$UserPath;$InstallDir",
         "User"
     )
 
-    Write-Host "  ✓ Added CommitDev to PATH" -ForegroundColor Green
-}
-else {
-    Write-Host "  › CommitDev is already in PATH."
+    Write-Host "  ✓ Added CommitDev to your PATH." -ForegroundColor Green
+
 }
 
-# ==========================================
-# Initialize CommitDev
-# ==========================================
+# ==================================================
+# Initialize
+# ==================================================
 
 Write-Host ""
-Write-Host "Initializing CommitDev..."
+Write-Host "• Initializing workspace..."
 
-try {
-    & $BinaryPath setup
-}
-catch {
-    Write-Host ""
-    Write-Host "✕ Installation completed, but setup failed." -ForegroundColor Yellow
-}
+& $BinaryPath setup
 
-# ==========================================
+Write-Host "  ✓ Workspace initialized." -ForegroundColor Green
+
+# ==================================================
 # Finished
-# ==========================================
+# ==================================================
 
 Write-Host ""
-Write-Host "✓ CommitDev installed successfully!" -ForegroundColor Green
+Write-Host "──────────────────────────────────────────────────"
+Write-Host "✓ CommitDev $LatestVersion is ready." -ForegroundColor Green
+
 Write-Host ""
+Write-Host "Run:"
 Write-Host ""
+Write-Host "  commitdev login"
+
 Write-Host ""
+Write-Host "If this is your first installation, restart PowerShell or Windows Terminal if the 'commitdev' command isn't available immediately."

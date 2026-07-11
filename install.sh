@@ -1,60 +1,165 @@
-#!/bin/sh
+#!/usr/bin/env sh
 set -e
 
-# Configuration
+# ==================================================
+# CommitDev Installer
+# ==================================================
+
 REPO="WaleX-projects/commitdev-cli"
 BINARY_NAME="commitdev"
-TARGET_DIR="/usr/local/bin"
+INSTALL_DIR="/usr/local/bin"
+TMP_FILE="/tmp/commitdev"
 
-# CommitDev Color System 
+# ==================================================
+# Colors
+# ==================================================
+
 BOLD='\033[1m'
-EMERALD='\033[38;5;48m' 
-DIM='\033[2m'           
+EMERALD='\033[38;5;48m'
+DIM='\033[2m'
+RED='\033[31m'
 RESET='\033[0m'
 
 echo ""
 echo "${BOLD}${EMERALD}CommitDev${RESET} ${DIM}•${RESET} Installer"
 echo "${DIM}──────────────────────────────────────────────────${RESET}"
 
-# Operating System detection block
-OS_TYPE=$(uname -s)
-if [ "$OS_TYPE" = "Linux" ]; then
-    ASSET_NAME="commitdev-linux"
-elif [ "$OS_TYPE" = "Darwin" ]; then
-    ASSET_NAME="commitdev-macos"
+# ==================================================
+# Detect Platform
+# ==================================================
+
+echo ""
+echo "• Detecting platform..."
+
+case "$(uname -s)" in
+    Linux*)
+        PLATFORM="Linux"
+        ASSET_NAME="commitdev-linux"
+        ;;
+    Darwin*)
+        PLATFORM="macOS"
+        ASSET_NAME="commitdev-macos"
+        ;;
+    *)
+        echo "  ${RED}✕ Unsupported operating system.${RESET}"
+        exit 1
+        ;;
+esac
+
+echo "  ${EMERALD}✓${RESET} ${PLATFORM}"
+
+# ==================================================
+# Check Existing Installation
+# ==================================================
+
+echo ""
+echo "• Checking existing installation..."
+
+CURRENT_VERSION=""
+
+if command -v commitdev >/dev/null 2>&1; then
+
+    CURRENT_VERSION=$(commitdev --version \
+        | grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' \
+        | head -1)
+
+    if [ -n "$CURRENT_VERSION" ]; then
+        echo "  ${EMERALD}✓${RESET} Found CommitDev ${CURRENT_VERSION}"
+    else
+        echo "  ${DIM}›${RESET} Existing installation detected."
+    fi
+
 else
-    echo "  ${DIM}✕ Error:${RESET} This install script only supports Linux and macOS."
+
+    echo "  ${DIM}›${RESET} CommitDev is not installed."
+
+fi
+
+# ==================================================
+# Latest Release
+# ==================================================
+
+echo ""
+echo "• Checking latest release..."
+
+LATEST_VERSION=$(curl -fsSL \
+"https://api.github.com/repos/$REPO/releases/latest" \
+| grep '"tag_name":' \
+| sed -E 's/.*"([^"]+)".*/\1/')
+
+if [ -z "$LATEST_VERSION" ]; then
+    echo "  ${RED}✕ Failed to determine the latest release.${RESET}"
     exit 1
 fi
 
-# ─── SMART VERSION DETECTION ───
-# Hits GitHub's API to find your latest published release tag automatically
-echo "  ${DIM}›${RESET} Checking latest release version..."
-VERSION=$(curl -s "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+echo "  ${EMERALD}✓${RESET} ${LATEST_VERSION}"
 
-if [ -z "$VERSION" ]; then
-    echo "  ${DIM}✕ Error:${RESET} Could not resolve latest release version. Falling back to API redirect..."
-    DOWNLOAD_URL="https://github.com/$REPO/releases/latest/download/$ASSET_NAME"
-else
-    echo "  ${DIM}›${RESET} Found active release: ${BOLD}$VERSION${RESET}"
-    DOWNLOAD_URL="https://github.com/$REPO/releases/download/$VERSION/$ASSET_NAME"
+# ==================================================
+# Already Up To Date?
+# ==================================================
+
+if [ "$CURRENT_VERSION" = "$LATEST_VERSION" ]; then
+
+    echo ""
+    echo "${DIM}──────────────────────────────────────────────────${RESET}"
+    echo "${EMERALD}✓${RESET} You're already running the latest version."
+    exit 0
+
 fi
 
-echo "  ${DIM}›${RESET} Downloading platform asset: ${BOLD}$ASSET_NAME${RESET}"
-# Download to /tmp safely
-curl -L -f "$DOWNLOAD_URL" -o "/tmp/$BINARY_NAME" || {
-    echo "  ${DIM}✕ Error:${RESET} Failed to download binary asset from $DOWNLOAD_URL."
-    echo "            Ensure your GitHub Actions workflow finished and uploaded the asset."
-    exit 1
-}
+# ==================================================
+# Download
+# ==================================================
 
-echo "  ${DIM}›${RESET} Moving binary to $TARGET_DIR ${DIM}(requires system privileges)${RESET}"
-sudo mv "/tmp/$BINARY_NAME" "$TARGET_DIR/$BINARY_NAME"
-sudo chmod +x "$TARGET_DIR/$BINARY_NAME"
-
-echo "  ${EMERALD}✓${RESET} Binary installed globally successfully"
 echo ""
 
-echo "${BOLD}Initializing CLI Workspace:${RESET}"
-# Execute with full path to prevent any shell hashing delay issues
-"$TARGET_DIR/$BINARY_NAME" setup
+if [ -n "$CURRENT_VERSION" ]; then
+    echo "• Updating CommitDev..."
+else
+    echo "• Installing CommitDev..."
+fi
+
+echo "  ${DIM}›${RESET} Downloading release..."
+
+DOWNLOAD_URL="https://github.com/$REPO/releases/download/$LATEST_VERSION/$ASSET_NAME"
+
+curl -L -f "$DOWNLOAD_URL" -o "$TMP_FILE"
+
+chmod +x "$TMP_FILE"
+
+echo "  ${EMERALD}✓${RESET} Download complete."
+
+# ==================================================
+# Install
+# ==================================================
+
+echo "  ${DIM}›${RESET} Installing executable..."
+
+sudo mv "$TMP_FILE" "$INSTALL_DIR/$BINARY_NAME"
+sudo chmod +x "$INSTALL_DIR/$BINARY_NAME"
+
+echo "  ${EMERALD}✓${RESET} Installed to ${INSTALL_DIR}/${BINARY_NAME}"
+
+# ==================================================
+# Initialize
+# ==================================================
+
+echo ""
+echo "• Initializing workspace..."
+
+"$INSTALL_DIR/$BINARY_NAME" setup
+
+echo "  ${EMERALD}✓${RESET} Workspace initialized."
+
+# ==================================================
+# Finished
+# ==================================================
+
+echo ""
+echo "${DIM}──────────────────────────────────────────────────${RESET}"
+echo "${EMERALD}✓${RESET} CommitDev ${LATEST_VERSION} is ready."
+echo ""
+echo "Run:"
+echo ""
+echo "  ${BOLD}commitdev login${RESET}"
+echo ""
