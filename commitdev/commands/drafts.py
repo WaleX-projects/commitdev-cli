@@ -22,6 +22,7 @@ from rich.theme import Theme
 from rich_pixels import Pixels
 from rich.panel import Panel
 
+
 # ─── LOCAL INTERNAL CORE APP IMPORTS ───────────────────────────────
 from commitdev.api import get, post
 from commitdev.config import get_token

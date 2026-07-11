@@ -6,7 +6,7 @@ from pathlib import Path
 import typer
 from rich.console import Console
 from rich.theme import Theme
-
+import subprocess 
 commitdev_theme = Theme({
     "brand": "bold spring_green3",
     "success": "spring_green3",
@@ -276,16 +276,16 @@ def uninstall():
         console.print(
             "  [meta]› No CommitDev Git hook found.[/meta]"
         )
-
+        
     # ==========================================
-    # STEP 4: Remove Executable
+    # STEP 4: Remove Global Executable
     # ==========================================
     console.print(
-        "\n[brand]Step 4:[/brand] [meta]Removing CommitDev executable...[/meta]"
+        "\n[brand]Step 4:[/brand] [meta]Finalizing uninstallation...[/meta]"
     )
-
-    removed = False
-
+    
+    binary_path = None
+    
     for binary in (
         "commitdev",
         "commitdev.exe",
@@ -293,54 +293,79 @@ def uninstall():
         "cdv.exe",
     ):
         binary_path = shutil.which(binary)
-
-        if not binary_path:
-            continue
-
-        try:
-            os.remove(binary_path)
-
-            console.print(
-                f"  [success]✓[/success] Removed executable: [meta]{binary_path}[/meta]"
-            )
-
-            removed = True
-
-        except PermissionError:
-            console.print(
-                "  [error]✕ Administrator privileges are required to remove the executable.[/error]"
-            )
-
-        except Exception as e:
-            console.print(
-                f"  [error]✕ Failed to remove executable:[/error] {e}"
-            )
-
-    if not removed:
-        console.print(
-            "  [meta]› No global CommitDev executable was found.[/meta]"
-        )
-
-    # ==========================================
-    # COMPLETE
-    # ==========================================
+        if binary_path:
+            break
+    
     console.print("\n[meta]──────────────────────────────────────────────────[/meta]")
-    console.print(
-        "[success]✓[/success] CommitDev has been successfully uninstalled."
-    )
-
-    if sys.platform == "win32":
-        console.print(
-            "[meta]Restart your terminal to refresh your PATH.[/meta]"
-        )
+    
+    if binary_path:
+    
+        if sys.platform == "win32":
+            try:
+                install_dir = str(Path(binary_path).parent)
+    
+                cleanup_script = (
+                    f'Start-Sleep -Seconds 2; '
+                    f'Remove-Item -LiteralPath "{binary_path}" -Force; '
+                    f'if (Test-Path "{install_dir}") {{ '
+                    f'if ((Get-ChildItem "{install_dir}" | Measure-Object).Count -eq 0) {{ '
+                    f'Remove-Item "{install_dir}" -Force }} }}'
+                )
+    
+                subprocess.Popen(
+                    [
+                        "powershell",
+                        "-NoProfile",
+                        "-ExecutionPolicy",
+                        "Bypass",
+                        "-Command",
+                        cleanup_script,
+                    ],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+    
+                console.print(
+                    "[success]✓[/success] CommitDev has been successfully uninstalled."
+                )
+                console.print(
+                    "[meta]The executable will be removed automatically after this process exits.[/meta]"
+                )
+                console.print(
+                    "[meta]Please restart your terminal to complete the removal.[/meta]"
+                )
+    
+            except Exception as e:
+                console.print(
+                    f"[error]✕ Failed to schedule executable removal:[/error] {e}"
+                )
+    
+        else:
+            console.print(
+                "[success]✓[/success] CommitDev configuration has been removed."
+            )
+    
+            console.print(
+                "[meta]The executable is installed in a protected system location.[/meta]"
+            )
+    
+            console.print(
+                "\n[brand]Run the following command to finish uninstalling:[/brand]"
+            )
+    
+            console.print(
+                f"  sudo rm \"{binary_path}\"",
+                style="brand",
+            )
+    
+            console.print(
+                "\n[meta]Then restart your terminal session.[/meta]"
+            )
+    
     else:
         console.print(
-            "[meta]Open a new terminal session to complete the uninstall.[/meta]"
+            "[success]✓[/success] CommitDev has been completely uninstalled."
         )
-
-
 if __name__ == "__main__":
     app()
-if __name__ == "__main__":
-    
-    app()
+

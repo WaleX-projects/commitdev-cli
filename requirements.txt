@@ -2,7 +2,7 @@ altgraph==0.17.5
 annotated-doc==0.0.4
 certifi==2026.6.17
 charset-normalizer==3.4.7
--e git+ssh://git@github.com/WaleX-projects/commitdev-cli.git@fa5fecce972c36c38f0ac7ff5aad8d9b9f5a6a96#egg=commitdev
+-e git+ssh://git@github.com/WaleX-projects/commitdev-cli.git@977a244cf3e71f4146b02514d341781e20d08d3b#egg=commitdev
 idna==3.18
 markdown-it-py==4.2.0
 mdurl==0.1.2
@@ -16,7 +16,9 @@ requests==2.34.2
 rich==15.0.0
 rich-pixels==3.0.1
 setuptools==82.0.1
+setuptools-scm==10.2.0
 shellingham==1.5.4
 typer==0.26.4
 urllib3==2.7.0
+vcs-versioning==2.2.2
 websockets==16.0

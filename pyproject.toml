@@ -1,11 +1,21 @@
+[build-system]
+requires = [
+    "setuptools>=64",
+    "setuptools-scm>=8",
+]
+build-backend = "setuptools.build_meta"
+
 [project]
-name = "commidev"
-version = "0.1.0"
-description = "CommitDev CLI"
+name = "commitdev"
+dynamic = ["version"]
 dependencies = [
     "typer",
-    "requests"
+    "requests",
 ]
 
 [project.scripts]
 commitdev = "commitdev.main:app"
+
+[tool.setuptools_scm]
+version_scheme = "no-guess-dev"
+local_scheme = "no-local-version"
