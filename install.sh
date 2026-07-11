@@ -6,7 +6,7 @@ REPO="WaleX-projects/commitdev-cli"
 BINARY_NAME="commitdev"
 TARGET_DIR="/usr/local/bin"
 
-# CommitDev Color System
+# CommitDev Color System 
 BOLD='\033[1m'
 EMERALD='\033[38;5;48m' 
 DIM='\033[2m'           

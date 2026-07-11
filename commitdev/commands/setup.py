@@ -52,11 +52,11 @@ def setup():
 # Read the last commit message locally
 commit_msg=$(git log -1 --format=%s)
 
-# Specifically look for [push] or post (case-insensitive)
+# Specifically look for [post] or post (case-insensitive)
 if echo "$commit_msg" | grep -iq "\\[post\\]"; then
     echo -e ""
     echo -e "\\033[1;35m✨ Hey! CommitDev here.\\033[0m"
-    echo -e "\\033[1;36mI spotted your \\033[1m[draft]\\033[22m tag. We've locked onto this commit and armed your pipeline.\\033[0m"
+    echo -e "\\033[1;36mI spotted your \\033[1m[post]\\033[22m tag. We've locked onto this commit and armed your pipeline.\\033[0m"
     echo -e "\\033[32mGo ahead and finish the push—I'll drop your live workspace right beneath it when it lands! 🚀\\033[0m"
     echo -e ""
 fi
@@ -91,10 +91,10 @@ git() {
         # 2. Check explicitly for [post] right after upload completes
         if [ $? -eq 0 ]; then
             if echo "$commit_msg" | grep -iq "\\[post\\]"; then
-                echo -e "\\n\\033[1;35m📡 Code is safe on GitHub. Spinnaker/Daphne connection spinning up...\\033[0m"
+                echo -e "\\n\\033[1;35m📡 Code is safe on GitHub. Time to tell the story...\\033[0m"
                 commitdev listen-for-drafts
             else
-                echo -e "\\n✅ Normal push complete."
+                echo -e "\\n Normal push complete."
             fi
         fi
     else
@@ -163,91 +163,184 @@ fi
     console.print("    [brand]commitdev login[/brand]\n")
 
 
+
+
 def uninstall():
-    """Removes global cdv shell wrappers and completely restores profiles cleanly."""
-    console.print("\n[brand]CommitDev[/brand] [meta]•[/meta] De-registration Sequence")
+    """Completely uninstall CommitDev from the current machine."""
+
+    console.print("\n[brand]CommitDev[/brand] [meta]•[/meta] Uninstall")
     console.print("[meta]──────────────────────────────────────────────────[/meta]")
-    
+
     home = Path.home()
-    targets = [home / ".bashrc", home / ".bash_profile", home / ".zshrc"]
+    shell_profiles = [
+        home / ".bashrc",
+        home / ".bash_profile",
+        home / ".zshrc",
+    ]
+
     config_path = home / ".commitdev.json"
-    
+
     # ==========================================
-    # STEP 1: Purge Configuration Cache
+    # STEP 1: Remove Configuration
     # ==========================================
-    console.print("[brand]Step 1:[/brand] [meta]Purging authentication credentials cache...[/meta]")
+    console.print(
+        "[brand]Step 1:[/brand] [meta]Removing local configuration...[/meta]"
+    )
+
     try:
         if config_path.exists():
             config_path.unlink()
-            console.print("  [success]✓[/success] Safely erased local configuration profile state data")
+            console.print(
+                "  [success]✓[/success] Removed CommitDev configuration."
+            )
         else:
-            console.print("  [meta]› Configuration profile data was already empty or clean.[/meta]")
+            console.print(
+                "  [meta]› No local configuration found.[/meta]"
+            )
     except Exception as e:
-        console.print(f"  [error]✕ Error clearing configuration profile:[/error] {e}")
+        console.print(
+            f"  [error]✕ Failed to remove configuration:[/error] {e}"
+        )
 
     # ==========================================
-    # STEP 2: Scrub Terminal Shell Profiles
+    # STEP 2: Clean Shell Profiles
     # ==========================================
-    console.print("\n[brand]Step 2:[/brand] [meta]Cleaning user terminal shell profiles...[/meta]")
+    console.print(
+        "\n[brand]Step 2:[/brand] [meta]Cleaning shell profiles...[/meta]"
+    )
+
     try:
-        for target in targets:
-            if target.exists():
-                lines = target.read_text(encoding="utf-8").splitlines()
-                cleaned_lines = []
-                skip = False
-                
-                for line in lines:
-                    # Catches both legacy commitdev markers and the new cdv namespace markers
-                    if ">>> commitdev" in line or ">>> cdv" in line:
-                        skip = True
-                        continue
-                    if "<<< commitdev" in line or "<<< cdv" in line:
-                        skip = False
-                        continue
-                    if not skip:
-                        cleaned_lines.append(line)
-                        
-                target.write_text("\n".join(cleaned_lines) + "\n", encoding="utf-8")
-        console.print("  [success]✓[/success] Removed custom intercept wrappers from shell environments")
+        for profile in shell_profiles:
+            if not profile.exists():
+                continue
+
+            lines = profile.read_text(encoding="utf-8").splitlines()
+
+            cleaned = []
+            skip = False
+
+            for line in lines:
+                if ">>> commitdev" in line or ">>> cdv" in line:
+                    skip = True
+                    continue
+
+                if "<<< commitdev" in line or "<<< cdv" in line:
+                    skip = False
+                    continue
+
+                if not skip:
+                    cleaned.append(line)
+
+            profile.write_text(
+                "\n".join(cleaned) + "\n",
+                encoding="utf-8",
+            )
+
+        console.print(
+            "  [success]✓[/success] Shell profiles restored."
+        )
+
     except Exception as e:
-        console.print(f"  [error]✕ Error cleaning shell configurations:[/error] {e}")
+        console.print(
+            f"  [error]✕ Failed to clean shell profiles:[/error] {e}"
+        )
 
     # ==========================================
-    # STEP 3: Remove Local Git Hook If It Exists
+    # STEP 3: Remove Git Hook
     # ==========================================
-    console.print("\n[brand]Step 3:[/brand] [meta]Checking local workspace hooks repository layers...[/meta]")
-    current_dir = Path.cwd()
-    pre_push_target = current_dir / ".git" / "hooks" / "pre-push"
-    
-    if pre_push_target.exists():
+    console.print(
+        "\n[brand]Step 3:[/brand] [meta]Checking Git hooks...[/meta]"
+    )
+
+    hook = Path.cwd() / ".git" / "hooks" / "pre-push"
+
+    if hook.exists():
         try:
-            content = pre_push_target.read_text(encoding="utf-8")
-            # Catches variations of CommitDev tags or your new automated short signatures
+            content = hook.read_text(encoding="utf-8")
+
             if "CommitDev" in content or "cdv" in content:
-                os.remove(pre_push_target)
-                console.print("  [success]✓[/success] Safely removed [meta].git/hooks/pre-push[/meta] tracker file")
+                hook.unlink()
+                console.print(
+                    "  [success]✓[/success] Removed CommitDev Git hook."
+                )
             else:
-                console.print("  [meta]› Local hook file was modified or custom. Leaving untouched.[/meta]")
+                console.print(
+                    "  [meta]› Git hook was not created by CommitDev. Leaving unchanged.[/meta]"
+                )
+
         except Exception as e:
-            console.print(f"  [meta]› Could not clean project hooks directory: {e}[/meta]")
+            console.print(
+                f"  [error]✕ Failed to remove Git hook:[/error] {e}"
+            )
     else:
-        console.print("  [meta]› No active CommitDev hooks found inside current directory architecture.[/meta]")
+        console.print(
+            "  [meta]› No CommitDev Git hook found.[/meta]"
+        )
 
     # ==========================================
-    # STEP 4: Finalize Core Binary Warnings
+    # STEP 4: Remove Executable
     # ==========================================
-    console.print("\n[brand]Step 4:[/brand] [meta]Finalizing de-registration checks...[/meta]")
-    console.print("[meta]──────────────────────────────────────────────────[/meta]")
-    console.print("[success]✓[/success] CommitDev uninstallation routine finalized safely")
-    
+    console.print(
+        "\n[brand]Step 4:[/brand] [meta]Removing CommitDev executable...[/meta]"
+    )
+
+    removed = False
+
+    for binary in (
+        "commitdev",
+        "commitdev.exe",
+        "cdv",
+        "cdv.exe",
+    ):
+        binary_path = shutil.which(binary)
+
+        if not binary_path:
+            continue
+
+        try:
+            os.remove(binary_path)
+
+            console.print(
+                f"  [success]✓[/success] Removed executable: [meta]{binary_path}[/meta]"
+            )
+
+            removed = True
+
+        except PermissionError:
+            console.print(
+                "  [error]✕ Administrator privileges are required to remove the executable.[/error]"
+            )
+
+        except Exception as e:
+            console.print(
+                f"  [error]✕ Failed to remove executable:[/error] {e}"
+            )
+
+    if not removed:
+        console.print(
+            "  [meta]› No global CommitDev executable was found.[/meta]"
+        )
+
+    # ==========================================
+    # COMPLETE
+    # ==========================================
+    console.print("\n[meta]──────────────────────────────────────────────────[/meta]")
+    console.print(
+        "[success]✓[/success] CommitDev has been successfully uninstalled."
+    )
+
     if sys.platform == "win32":
-        console.print("  [meta]ℹ Note: To fully remove the app binary, erase cdv-windows.exe or cdv.exe from your PATH environment locations.[/meta]\n")
-    elif sys.platform == "darwin":
-        console.print("  [meta]ℹ Note: To fully remove the executable asset binary, run: sudo rm /usr/local/bin/commitdev[/meta]\n")
+        console.print(
+            "[meta]Restart your terminal to refresh your PATH.[/meta]"
+        )
     else:
-        console.print("  [meta]ℹ Note: To fully remove the executable asset binary, run: sudo rm /usr/local/bin/commitdev[/meta]\n")
+        console.print(
+            "[meta]Open a new terminal session to complete the uninstall.[/meta]"
+        )
 
 
+if __name__ == "__main__":
+    app()
 if __name__ == "__main__":
     
     app()

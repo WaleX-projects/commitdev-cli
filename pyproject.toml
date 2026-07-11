@@ -1,5 +1,5 @@
 [project]
-name = "commitdev"
+name = "commidev"
 version = "0.1.0"
 description = "CommitDev CLI"
 dependencies = [

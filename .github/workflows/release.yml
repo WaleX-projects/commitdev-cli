@@ -67,22 +67,29 @@ jobs:
       with:
         path: distribution_vault
 
-    - name: Flatten Production Directory Layout
+    - name: Assemble Release Assets
       run: |
         mkdir -p dist_final
-        # Safely extracts the binaries out of their temporary multi-runner subdirectories
-        find distribution_vault -type f -exec mv {} dist_final/ \;
-        # Injects your helper install asset into the deployment payload folder if it exists
-        if [ -f "install.sh" ]; then cp install.sh dist_final/; fi
 
-    - name: Publish Automated GitHub Release Page
+        # Collect compiled binaries from all build runners
+        find distribution_vault -type f -exec mv {} dist_final/ \;
+
+        # Include installer scripts
+        [ -f install.sh ] && cp install.sh dist_final/
+        [ -f install.ps1 ] && cp install.ps1 dist_final/
+
+        echo "Release contents:"
+        ls -lah dist_final
+
+    - name: Publish GitHub Release
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        # Explicitly targets compiled binaries to prevent wildcard/hidden folder evaluation errors
         gh release create "${{ github.ref_name }}" \
           dist_final/commitdev-linux \
           dist_final/commitdev-macos \
           dist_final/commitdev-windows.exe \
-          --title "Release ${{ github.ref_name }}" \
-          --notes "Automated distribution payload matrix compilation for CommitDev CLI ${{ github.ref_name }}."
+          dist_final/install.sh \
+          dist_final/install.ps1 \
+          --title "CommitDev CLI ${{ github.ref_name }}" \
+          --notes "Official CommitDev CLI release for Linux, macOS, and Windows."
