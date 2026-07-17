@@ -22,7 +22,6 @@ from rich.theme import Theme
 from rich_pixels import Pixels
 from rich.panel import Panel
 
-
 # ─── LOCAL INTERNAL CORE APP IMPORTS ───────────────────────────────
 from commitdev.api import get, post
 from commitdev.config import get_token
@@ -43,10 +42,14 @@ commitdev_theme = Theme({
 
 console = Console(theme=commitdev_theme, highlight=False)
 
+# Initialize Typer App CLI Router
+app = typer.Typer(help="CommitDev CLI Drafts Controller Management Console")
+
 
 # ──────────────────────────────────────────────────────────
 # STANDARD CLI COMMAND HANDLERS
 # ──────────────────────────────────────────────────────────
+
 
 def drafts():
     """List all of your CommitDev drafts."""
@@ -79,6 +82,7 @@ def drafts():
         )
 
     console.print("[meta]──────────────────────────────────────────────────[/meta]\n")
+
 
 
 def draft(id: int):
@@ -116,8 +120,25 @@ def approve(id: int):
         try:
             data = post(f"/cli/drafts/{id}/approve/")
             console.print(f"  [success]✓[/success] Draft node [white]#{data.get('draft_id')}[/white] locked into deployment sequence successfully.\n")
+            
+            targets = data.get("targets", [])
+            if targets:
+                console.print("[meta]Deployment Targets:[/meta]")
+                for target in targets:
+                    platform = target.get("platform", "Unknown").title()
+                    status = target.get("status", "pending")
+                    url = target.get("url")
+                    
+                    if status == "success" and url:
+                        console.print(f"  • [green]{platform}[/green]: [link={url}]{url}[/link]")
+                    elif status == "failed":
+                        console.print(f"  • [red]{platform}[/red]: ✕ Failed to publish")
+                    else:
+                        console.print(f"  • [yellow]{platform}[/yellow]: Processing ({status})")
+                console.print("")
         except Exception as e:
             console.print(f"  [error]✕ Authorization payload dropped:[/error] [meta]{e}[/meta]\n")
+
 
 
 def regenerate(id: int):
@@ -200,6 +221,7 @@ def prompt_select(options: list, message: str) -> str:
 # WIZARD + REVIEW HUB INTERACTIVE PUBLISHING ENGINE
 # ──────────────────────────────────────────────────────────
 
+
 async def handle_publishing_pipeline(ws, payload):
     """
     Executes the CommitDev Publish Pipeline using a Wizard + Review Hub pattern.
@@ -210,12 +232,19 @@ async def handle_publishing_pipeline(ws, payload):
       - Execution: Dispatches content to live clusters with partial retry loops
     """
     post_id = payload.get('post_id')
-    current_content = payload.get('content', '')
     repo_name = payload.get('repository', 'commitdev-cli')
     commit_msg = payload.get('commit_message', 'feat(cli): add pipeline execution blocks')
     
-    staged_platforms = [platform.capitalize() for platform in payload.get('staged_platforms', ['LinkedIn', 'X'])]
+    # Store drafts in a dictionary mapping {provider: content}
+    posts_by_platform = payload.get('posts_by_platform', {})
+    staged_platforms = [p.capitalize() for p in payload.get('staged_platforms', ['LinkedIn', 'X'])]
     
+    # Backfill platform content if missing from payload
+    for platform in staged_platforms:
+        p_lower = platform.lower()
+        if p_lower not in posts_by_platform:
+            posts_by_platform[p_lower] = payload.get('content', '')
+
     attached_images = []
     
     def render_image_preview(img_source, img_name, kb_size, is_url):
@@ -249,17 +278,26 @@ async def handle_publishing_pipeline(ws, payload):
             console.print(f"  [white]{img_name}[/white]\n  [meta]{w}×{h} • {kb_size:.1f} KB (Preview render fallback: {str(e)})[/meta]")
 
     # =========================================================================
-    # NESTED TASK ROUTINES (Directly return back to the Review Hub on completion)
+    # NESTED TASK ROUTINES
     # =========================================================================
 
     async def run_edit_content_sequence():
-        nonlocal current_content
-        console.print("\n[brand]📝 EDIT DRAFT CONTENT[/brand]")
+        nonlocal posts_by_platform
+        if not staged_platforms:
+            console.print("\n  [error]✕ Edit Aborted:[/error] No target platforms are active to edit.\n")
+            return
+
+        # Let user choose which specific copy platform to edit
+        edit_target = prompt_select(staged_platforms, "Which platform draft do you want to edit?")
+        platform_key = edit_target.lower()
+        current_content = posts_by_platform.get(platform_key, "")
+
+        console.print(f"\n[brand]📝 EDITING DRAFT FOR {edit_target.upper()}[/brand]")
         console.print("[meta]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/meta]")
         
         initial_txt = (
             f"# ──────────────────────────────────────────────────────────\n"
-            f"# 📝 COMMITDEV EDIT SESSION\n"
+            f"# 📝 COMMITDEV EDIT SESSION - {edit_target.upper()}\n"
             f"# ──────────────────────────────────────────────────────────\n"
             f"# Target Post ID: {post_id}\n"
             f"#\n"
@@ -273,7 +311,7 @@ async def handle_publishing_pipeline(ws, payload):
         edited_result = await loop.run_in_executor(None, open_in_editor, initial_txt)
         
         if edited_result:
-            current_content = "\n".join([
+            sanitized_content = "\n".join([
                 line for line in edited_result.splitlines() 
                 if not line.strip().startswith("#")
             ]).strip()
@@ -283,27 +321,43 @@ async def handle_publishing_pipeline(ws, payload):
                 await ws.send(json.dumps({
                     "action": "update_draft",
                     "post_id": post_id,
-                    "content": current_content
+                    "platform": platform_key,
+                    "content": sanitized_content
                 }))
                 
-                # Receive confirm response from the consumer
+                # Receive payload wrapper: {"type": "send_private_message", "payload": {...}}
                 response = await ws.recv()
                 data = json.loads(response)
-                # Keep client copy and database layout completely sync'd
-                current_content = data.get("payload", {}).get("content", current_content)
+                payload_data = data.get("payload", {})
                 
-            console.print("  [success]✓ Sync Complete: Draft updated.[/success]\n")
+                # Sync internal state using consumer keys
+                posts_by_platform[platform_key] = payload_data.get("content", sanitized_content)
+                
+            console.print(f"  [success]✓ Sync Complete: {edit_target} draft updated.[/success]\n")
 
     async def run_regenerate_content_sequence():
-        nonlocal current_content
-        console.print("\n[brand] REGENERATING WORKSPACE TEXT[/brand]")
+        nonlocal posts_by_platform
+        if not staged_platforms:
+            console.print("\n  [error]✕ Regeneration Aborted:[/error] No target platforms are active to regenerate.\n")
+            return
+
+        target_to_regen = prompt_select(staged_platforms, "Which platform draft would you like to regenerate?")
+        platform_key = target_to_regen.lower()
+
+        console.print(f"\n[brand] REGENERATING {target_to_regen.upper()} WORKSPACE TEXT[/brand]")
         console.print("[meta]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/meta]")
         with console.status("[meta]Instructing AI model to rewrite text context trees...[/meta]", spinner="simpleDots"):
-            await ws.send(json.dumps({"action": "regenerate_draft", "post_id": post_id}))
+            await ws.send(json.dumps({
+                "action": "regenerate_draft", 
+                "post_id": post_id, 
+                "platform": platform_key
+            }))
             response = await ws.recv()
             data = json.loads(response)
-            current_content = data.get("payload", {}).get("content", current_content)
-        console.print("\n[success]✓ Post content reconstructed successfully via AI engine.[/success]\n")
+            payload_data = data.get("payload", {})
+            
+            posts_by_platform[platform_key] = payload_data.get("content", posts_by_platform.get(platform_key, ""))
+        console.print(f"\n[success]✓ {target_to_regen} copy reconstructed successfully via AI engine.[/success]\n")
 
     async def run_image_manager_sequence():
         console.print("\n[brand] MEDIA WORKSPACE MANAGER[/brand]")
@@ -384,12 +438,23 @@ async def handle_publishing_pipeline(ws, payload):
                         await asyncio.sleep(0.02)
                         progress.update(task, advance=5)
 
-            # ─── RENDERING INLINE IMAGE FRAME PREVIEW ───
+            # ─── RENDERING INLINE IMAGE FRAME PREVIEW AND UPLODING TO THE BACKEND ───
             console.print("\n[meta]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/meta]")
             console.print("  [white]Attached Image Data Frame Preview[/white]")
             
             img_source = io.BytesIO(img_bytes) if is_url else img_path
             render_image_preview(img_source, img_name, kb_size, is_url)
+            
+            with console.status("[meta] Image uploading...[/meta]", spinner="simpleDots"):
+                # Notice we matches the plural 'upload_images' payload action now
+                await ws.send(json.dumps({
+                    "action": "upload_images", 
+                    "post_id": post_id,
+                    "image": str(path_input)
+                }))
+                response = await ws.recv()
+                data = json.loads(response)
+                console.print("\n[success]✓ Image Linked Successfully[/success]\n")
             
             console.print("[meta]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/meta]\n")
             attached_images.append(path_input if is_url else img_path)
@@ -397,12 +462,10 @@ async def handle_publishing_pipeline(ws, payload):
     async def run_platforms_manager_sequence():
         nonlocal staged_platforms
         console.print("\n[brand]📡 CHANNELS CONFIGURATION[/brand]")
-        
-        console.print(f"\n[brand]{staged_platforms}[/brand]")
-        
+        console.print(f"\n[brand]Currently Armed: {staged_platforms}[/brand]")
         console.print("[meta]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/meta]")
         
-        available_channels = ["Linkedin", "X", "Dev.to", "Medium"]
+        available_channels = ["LinkedIn", "X", "Dev.to", "Medium"]
         
         while True:
             console.print("  Manage active target channels below:")
@@ -422,132 +485,137 @@ async def handle_publishing_pipeline(ws, payload):
                 console.print(f"  [meta]›[/meta] Disabled [yellow]{selected_channel}[/yellow] transmission cluster.\n")
             else:
                 staged_platforms.append(selected_channel)
+                # Initialize template layout if empty
+                p_key = selected_channel.lower()
+                if p_key not in posts_by_platform:
+                    posts_by_platform[p_key] = f"New Draft for {selected_channel} from: '{commit_msg}'"
                 console.print(f"  [meta]›[/meta] Enabled [success]{selected_channel}[/success] transmission cluster.\n")
 
     # =========================================================================
-    # STAGE 1 & 2: WIZARD BOOTSTRAP (FIRST TIME PASS-THROUGH)
-    # =========================================================================
-    console.print("\n[brand]✨ CommitDev Publish Pipeline Init[/brand]")
-    console.print("[meta]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/meta]")
-    console.print(f"  Repository  [meta]›[/meta] [white]{repo_name}[/white]")
-    console.print(f"  Commit      [meta]›[/meta] {commit_msg}")
-    console.print(f"  Platforms   [meta]›[/meta] [white]{' • '.join(staged_platforms)}[/white]")
-    console.print("[meta]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/meta]\n")
-
-    console.print(Panel(
-        current_content,
-        title="[brand]Staged Copy[/brand]",
-        border_style="dim grey39"
-    ))
-    console.print()
-
-    wizard_init = prompt_select(["Configure Media & Channels First", "Proceed straight to Review Hub"], "How would you like to initialize this deployment sequence?")
-    
-    if wizard_init == "Configure Media & Channels First":
-        await run_image_manager_sequence()
-        await run_platforms_manager_sequence()
-
-    # =========================================================================
-    # THE REVIEW HUB CENTRAL ROUTING LAYER
+    # THE INTERACTIVE REVIEW HUB STATE MACHINE LOOP
     # =========================================================================
     while True:
-        console.print("\n[meta]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/meta]")
-        console.print("         🚀 COMMITDEV READY TO PUBLISH REVIEW HUB")
+        console.print("\n[brand]CommitDev[/brand] [meta]•[/meta] Interactive Review Hub")
         console.print("[meta]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/meta]")
-        console.print(f"  Repository  [meta]›[/meta] [white]{repo_name}[/white]")
-        console.print(f"  Platforms   [meta]›[/meta] {', '.join([f'[success]✓ {p}[/success]' for p in staged_platforms]) if staged_platforms else '[error]None Selected[/error]'}")
-        console.print(f"  Media Assets[meta]›[/meta] [white]{len(attached_images)} files linked[/white]")
         
-        preview_snippet = current_content[:140].replace('\n', ' ')
-        console.print(f"  Staged Text [meta]›[/meta]\n  [dim]\"{preview_snippet}...\"[/dim]")
-        console.print("[meta]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/meta]\n")
+        # Format list of images for clean layout view
+        attached_desc = ", ".join([
+            str(p).split('/')[-1] if not str(p).startswith("http") else "Remote Asset" 
+            for p in attached_images
+        ]) if attached_images else "None"
+        
+        # Build platform summaries
+        platform_copies = ""
+        for platform in staged_platforms:
+            p_key = platform.lower()
+            content_preview = posts_by_platform.get(p_key, "[dim italic]Empty copy draft[/dim italic]")
+            # Indent each target copy text for legibility
+            formatted_preview = "\n".join([f"    {line}" for line in content_preview.splitlines()])
+            platform_copies += f"  [cyan]• {platform.upper()}:[/cyan]\n{formatted_preview}\n\n"
 
-        hub_action = prompt_select([
-            "Edit Content (Manual Editor)",
-            "Regenerate Content (AI Engine)",
-            "Manage Media & Images",
-            "Configure Publishing Platforms",
-            "Publish Staged Configuration Live 🚀",
-            "Save as Draft to Cloud",
-            "Exit Pipeline"
-        ], "Review Hub Control Board Selection:")
-
-        if hub_action == "Exit Pipeline":
-            console.print("  [meta]› Aborting execution pipeline loop. Staging memory discarded.[/meta]\n")
-            return
-            
-        elif hub_action == "Save as Draft to Cloud":
-            console.print("  [success]✓ Staged pipeline state successfully captured and written to Cloud boards.[/success]\n")
-            return
-            
-        elif hub_action == "Edit Content (Manual Editor)":
+        hub_summary = (
+            f"[white]Repository:[/white] {repo_name}\n"
+            f"[white]Commit Msg:[/white] {commit_msg}\n"
+            f"[white]Media files:[/white] {attached_desc}\n"
+            f"[meta]──────────────────────────────────────────────────[/meta]\n"
+            f"[white]Platform Target Specifications:[/white]\n\n"
+            f"{platform_copies or '  [red]No Target Platforms Enabled[/red]\n'}"
+        )
+        
+        console.print(Panel(hub_summary, title="[brand]POST SPECIFICATION[/brand]", border_style="grey39"))
+        
+        # Menu Selection Loop
+        hub_options = [
+            " Edit Content",
+            " Regenerate (AI Rewrite)",
+            " Manage Media Attachments (expermental)",
+            " Toggle Target Channels",
+            " 🚀 Deploy & Publish Now",
+            " Cancel / Abort Deployment"
+        ]
+        
+        selection = prompt_select(hub_options, "Select action cluster to execute:")
+        
+        if "Edit" in selection:
             await run_edit_content_sequence()
-            
-        elif hub_action == "Regenerate Content (AI Engine)":
+        elif " Regenerate" in selection:
             await run_regenerate_content_sequence()
-            
-        elif hub_action == "Manage Media & Images":
+        elif "Manage Media" in selection:
             await run_image_manager_sequence()
-            
-        elif hub_action == "Configure Publishing Platforms":
+        elif " Toggle" in selection:
             await run_platforms_manager_sequence()
-            
-        elif hub_action == "Publish Staged Configuration Live 🚀":
+        elif "Deploy" in selection:
             if not staged_platforms:
-                console.print("  [error]✕ Configuration Error: Cannot publish when platform target routing is empty.[/error]\n")
+                console.print("\n  [error]✕ Transmission Aborted:[/error] At least one platform target must be active.\n")
                 continue
-            break
-
-    # =========================================================================
-    # EXECUTION & PARTIAL DISTRIBUTIONS ERROR RETRY LOOP
-    # =========================================================================
-    active_targets = list(staged_platforms)
-    
-    while True:
-        console.print("\n[brand]Publishing post to target network matrices...[/brand]")
-        await ws.send(json.dumps({"action": "publish_draft", "post_id": post_id}))
-        
-        # Pull return payload confirmation from Django consumer backchannel
-        response = await ws.recv()
-        data = json.loads(response)
-        payload_data = data.get("payload", {})
-        print("payload for publishing", payload_data)
-        status = payload_data.get("status")
-        
-        failed_channels = {}
-        for p in active_targets:
-            with Progress(SpinnerColumn(), TextColumn("[meta]{task.description}[/meta]"), console=console) as progress:
-                task = progress.add_task(f"Dispatching distribution packet to {p} cluster...", total=None)
-                await asyncio.sleep(1.2)
+                
+            console.print("\n[brand]🚀 TRANSMITTING CORE DEPLOYMENT TARGETS[/brand]")
+            console.print("[meta]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/meta]")
             
-            # Simulated cluster failure reporting matched to database parameters
-            if status == "failed" or p == "X":
-                failed_channels[p] = "Rate limit exceeded"
-                console.print(f"  [error]✕ {p}[/error]  [meta]───[/meta] [error]Failed: Rate limit exceeded (code 429)[/error]")
-            else:
-                console.print(f"  [success]✓ {p}[/success]  [meta]───[/meta] Published successfully")
-
-        if not failed_channels:
-            console.print("\n[meta]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/meta]")
-            console.print("  [brand]✓ Deployment Pipeline Concluded Successfully[/brand]")
-            console.print(f"  Draft ID    [meta]›[/meta] {post_id}")
-            console.print(f"  Media Slots [meta]›[/meta] {len(attached_images)} assets distributed")
-            console.print("[meta]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/meta]\n")
-            break
-        else:
-            console.print(f"\n[error]⚠ Warning: Distribution pipeline partially dropped clusters.[/error]")
-            error_action = prompt_select(["Retry Failed Clusters", "Save Pending to Cloud", "Exit Pipeline"], "Select response routing strategy:")
+            # Send publish action
+            with console.status("[meta]Enqueuing publishing workers on server cluster...[/meta]", spinner="simpleDots"):
+                try:
+                    await ws.send(json.dumps({
+                        "action": "publish_draft",
+                        "post_id": post_id
+                    }))
+                    
+                    # 1. First response back: Immediate acknowledgment that task is queued.
+                    response = await ws.recv()
+                    ack_result = json.loads(response)
+                    payload_data = ack_result.get("payload", {})
+                    
+                    if payload_data.get("status") == "publishing_started":
+                        console.print("  [meta]🚀 Task accepted by queue. Awaiting provider feedback...[/meta]")
+                    else:
+                        raise ValueError("No queuing task confirmation received.")
+                        
+                except Exception as e:
+                    console.print(f"  [error]✕ Queue dispatch failed:[/error] [meta]{e}[/meta]\n")
+                    break
             
-            if error_action == "Retry Failed Clusters":
-                active_targets = list(failed_channels.keys())
-                continue
-            elif error_action == "Save Pending to Cloud":
-                console.print("  [success]✓ Retained status parameters for failed networks back to Cloud board.[/success]\n")
+            # 2. Block until the Celery task fires `publish_completed` broadcast back over the socket connection
+            with console.status("[meta]Waiting for API providers response tokens...[/meta]", spinner="simpleDots"):
+                try:
+                    completed_response = await ws.recv()
+                    result = json.loads(completed_response)
+                    payload = result.get("payload", {})
+                except Exception as e:
+                    console.print(f"  [error]✕ Connection closed or timed out before completion feedback: {e}[/error]\n")
+                    break
+
+            if payload.get("status") == "published":
+                console.print(f"\n  [success]✓ Deployment complete for node #{post_id}! [/success]\n")
+                
+                # Check successes
+                successful = payload.get("platforms", [])
+                failed = payload.get("failed_platforms", [])
+                urls = payload.get("urls", {})
+                
+                if successful:
+                    console.print("[meta]Successful Transmissions:[/meta]")
+                    for platform in successful:
+                        url = urls.get(platform, "No live link provided by provider")
+                        console.print(f"  • [green]{platform.upper()}[/green]: [link={url}]{url}[/link]")
+                        
+                if failed:
+                    console.print("\n[meta]Failed Transmissions:[/meta]")
+                    for platform in failed:
+                        console.print(f"  • [red]{platform.upper()}[/red]: Server-side interface failed.")
+                console.print("")
                 break
             else:
+                error_msg = payload.get("error", "The operations queue returned zero success confirmations.")
+                console.print(f"  [error]✕ Transmission Failed:[/error] [meta]{error_msg}[/meta]\n")
                 break
+                
+        elif "Cancel" in selection:
+            console.print("\n[warn]⚠ Deployment sequence aborted by operator.[/warn]\n")
+            break
 
-
+# ──────────────────────────────────────────────────────────
+# CLI ENTRYPOINT ROUTINE
+# ──────────────────────────────────────────────────────────
 async def _listen_for_drafts_loop():
     while True:
         token = fetch_fresh_token()
@@ -599,3 +667,7 @@ def listen_for_drafts():
         asyncio.run(_listen_for_drafts_loop())
     except KeyboardInterrupt:
         console.print("\n  [meta]› Agent sequence halted gracefully via terminal signal. Good bye.[/meta]\n")
+        
+
+
+

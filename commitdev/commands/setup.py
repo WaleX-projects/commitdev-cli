@@ -83,34 +83,40 @@ exit 0
     git_wrapper_code = """
 # >>> commitdev git core hook >>>
 git() {
+
     if [ "$1" = "push" ]; then
-        local commit_msg=$(command git log -1 --format=%s)
-        
-        # 1. Run the native git push
+
+        commit_msg=$(command git log -1 --format=%s)
+
+        # Run native git push
         command git "$@"
-        
-        # 2. Check explicitly for [post] right after upload completes
-        if [ $? -eq 0 ]; then
-            if echo "$commit_msg" | grep -iq "\\[post\\]"; then
-                echo -e "\\n\\033[1;35m📡 Code is safe on GitHub. Time to tell the story...\\033[0m"
+
+        push_status=$?
+
+        if [ $push_status -eq 0 ]; then
+
+            if echo "$commit_msg" | grep -iq "\[post\]"; then
+
+                echo -e "\n\033[1;35m📡 Code is safe on GitHub. Time to tell the story...\033[0m"
+
                 commitdev listen-for-drafts
+
             else
-                echo -e "\\n Normal push complete."
+
+                echo -e "\n\033[2mNormal push complete.\033[0m"
+
             fi
+
         fi
+
     else
+
         command git "$@"
+
     fi
+
 }
 # <<< commitdev git core hook <<<
-"""
-
-    windows_bridge_code = """
-# >>> commitdev windows bridge >>>
-if [ -f ~/.bashrc ]; then
-    . ~/.bashrc
-fi
-# <<< commitdev windows bridge <<<
 """
 
     try:

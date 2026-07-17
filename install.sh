@@ -6,9 +6,6 @@ set -e
 # ==================================================
 
 REPO="WaleX-projects/commitdev-cli"
-BINARY_NAME="commitdev"
-INSTALL_DIR="/usr/local/bin"
-TMP_FILE="/tmp/commitdev"
 
 # ==================================================
 # Colors
@@ -35,18 +32,48 @@ case "$(uname -s)" in
     Linux*)
         PLATFORM="Linux"
         ASSET_NAME="commitdev-linux"
+        BINARY_NAME="commitdev"
+        INSTALL_DIR="/usr/local/bin"
+        TMP_FILE="/tmp/commitdev"
         ;;
     Darwin*)
         PLATFORM="macOS"
         ASSET_NAME="commitdev-macos"
+        BINARY_NAME="commitdev"
+        INSTALL_DIR="/usr/local/bin"
+        TMP_FILE="/tmp/commitdev"
+        ;;
+    MINGW*|MSYS*|CYGWIN*)
+        PLATFORM="Windows (Git Bash)"
+        ASSET_NAME="commitdev-windows.exe"
+        BINARY_NAME="commitdev.exe"
+        INSTALL_DIR="/usr/bin"
+        TMP_FILE="/tmp/commitdev.exe"
         ;;
     *)
-        echo "  ${RED}✕ Unsupported operating system.${RESET}"
+        echo "  ${RED}✕ Unsupported operating system or shell environment.${RESET}"
         exit 1
         ;;
 esac
 
 echo "  ${EMERALD}✓${RESET} ${PLATFORM}"
+
+# ==================================================
+# Check Write Permissions & Setup Sudo
+# ==================================================
+
+USE_SUDO=""
+if [ "$PLATFORM" != "Windows (Git Bash)" ]; then
+    # If we don't have write access to the directory, prep 'sudo'
+    if [ ! -w "$INSTALL_DIR" ]; then
+        if command -v sudo >/dev/null 2>&1; then
+            USE_SUDO="sudo"
+        else
+            echo "  ${RED}✕ Write permission denied for $INSTALL_DIR and sudo is not available.${RESET}"
+            exit 1
+        fi
+    fi
+fi
 
 # ==================================================
 # Check Existing Installation
@@ -57,9 +84,9 @@ echo "• Checking existing installation..."
 
 CURRENT_VERSION=""
 
-if command -v commitdev >/dev/null 2>&1; then
+if command -v "$BINARY_NAME" >/dev/null 2>&1; then
 
-    CURRENT_VERSION=$(commitdev --version \
+    CURRENT_VERSION=$("$BINARY_NAME" --version \
         | grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' \
         | head -1)
 
@@ -135,8 +162,8 @@ echo "  ${EMERALD}✓${RESET} Download complete."
 
 echo "  ${DIM}›${RESET} Installing executable..."
 
-sudo mv "$TMP_FILE" "$INSTALL_DIR/$BINARY_NAME"
-sudo chmod +x "$INSTALL_DIR/$BINARY_NAME"
+$USE_SUDO mv "$TMP_FILE" "$INSTALL_DIR/$BINARY_NAME"
+$USE_SUDO chmod +x "$INSTALL_DIR/$BINARY_NAME"
 
 echo "  ${EMERALD}✓${RESET} Installed to ${INSTALL_DIR}/${BINARY_NAME}"
 
