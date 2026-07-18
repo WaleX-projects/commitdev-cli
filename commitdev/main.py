@@ -112,10 +112,10 @@ from commitdev.commands.integrations import integrations
 
 from commitdev.commands.drafter import (
     drafts,
-    draft,
-    approve,
-    regenerate,
-    listen_for_drafts
+    #draft,
+    #approve,
+   # regenerate,
+   # listen_for_drafts
 )
 
 # ==========================================
@@ -164,10 +164,10 @@ app.command()(activity)
 # ==========================================
 
 app.command()(drafts)
-app.command()(draft)
-app.command()(approve)
-app.command()(regenerate)
-app.command()(listen_for_drafts)
+#app.command()(draft)
+#app.command()(approve)
+#app.command()(regenerate)
+#app.command()(listen_for_drafts)
 
 # ==========================================
 # Posts
