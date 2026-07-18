@@ -40,7 +40,7 @@ jobs:
       run: |
         pyinstaller \
           --onefile \
-          --hidden-import="rich_pixels" /
+          --hidden-import="rich_pixels" \
           --hidden-import="commitdev.commands.analytics" \
           --hidden-import="commitdev.commands.auth" \
           --hidden-import="commitdev.commands.drafts" \
