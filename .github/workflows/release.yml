@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   build:
-    name: Build on ${{ matrix.os }}
+    name: Build (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -18,22 +18,19 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            asset_name: commitdev-linux
-            separator: ":"
+            asset: commitdev-linux
 
           - os: macos-latest
-            asset_name: commitdev-macos
-            separator: ":"
+            asset: commitdev-macos
 
           - os: windows-latest
-            asset_name: commitdev-windows.exe
-            separator: ";"
+            asset: commitdev-windows.exe
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.10"
@@ -42,29 +39,45 @@ jobs:
       - name: Upgrade pip
         run: python -m pip install --upgrade pip
 
-      - name: Install Build Dependencies
+      - name: Install Dependencies
         run: |
-          pip install \
-            pyinstaller \
-            typer \
-            requests \
-            websockets \
-            python-dotenv \
-            Pillow \
-            rich-pixels \
-            setuptools \
-            setuptools-scm
+          pip install pyinstaller
+          pip install Pillow
+          pip install rich-pixels
+          pip install typer
+          pip install requests
+          pip install websockets
+          pip install python-dotenv
+          pip install setuptools
+          pip install setuptools-scm
 
-      - name: Install CommitDev Package
+      - name: Install CommitDev
         run: |
           pip install .
 
-      - name: Show Repository Structure
+      # -------------------------
+      # Debug (Linux/macOS)
+      # -------------------------
+      - name: Show Project Files (Linux/macOS)
+        if: runner.os != 'Windows'
         run: |
-          echo "==== Repository Files ===="
+          echo "===== Project Structure ====="
           find commitdev -type f
 
-      - name: Build Executable (Linux/macOS)
+      # -------------------------
+      # Debug (Windows)
+      # -------------------------
+      - name: Show Project Files (Windows)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          Write-Host "===== Project Structure ====="
+          Get-ChildItem commitdev -Recurse
+
+      # -------------------------
+      # Build Linux/macOS
+      # -------------------------
+      - name: Build Binary (Linux/macOS)
         if: runner.os != 'Windows'
         run: |
           pyinstaller \
@@ -72,13 +85,16 @@ jobs:
             --noconfirm \
             --onefile \
             --collect-submodules commitdev \
-            --add-data "commitdev/hooks${{ matrix.separator }}commitdev/hooks" \
-            --name "${{ matrix.asset_name }}" \
+            --add-data "commitdev/hooks:commitdev/hooks" \
+            --name "${{ matrix.asset }}" \
             commitdev/main.py
 
-          chmod +x dist/${{ matrix.asset_name }}
+          chmod +x dist/${{ matrix.asset }}
 
-      - name: Build Executable (Windows)
+      # -------------------------
+      # Build Windows
+      # -------------------------
+      - name: Build Binary (Windows)
         if: runner.os == 'Windows'
         shell: powershell
         run: |
@@ -88,19 +104,37 @@ jobs:
             --onefile `
             --collect-submodules commitdev `
             --add-data "commitdev/hooks;commitdev/hooks" `
-            --name "${{ matrix.asset_name }}" `
+            --name "${{ matrix.asset }}" `
             commitdev/main.py
 
-      - name: Show PyInstaller Warnings
-        if: always()
+      # -------------------------
+      # PyInstaller warnings (Linux/macOS)
+      # -------------------------
+      - name: Show PyInstaller Warnings (Linux/macOS)
+        if: always() && runner.os != 'Windows'
         run: |
           find build -name "warn-*.txt" -exec cat {} \; || true
+
+      # -------------------------
+      # PyInstaller warnings (Windows)
+      # -------------------------
+      - name: Show PyInstaller Warnings (Windows)
+        if: always() && runner.os == 'Windows'
+        shell: powershell
+        run: |
+          $files = Get-ChildItem build -Recurse -Filter "warn-*.txt" -ErrorAction SilentlyContinue
+
+          foreach ($file in $files) {
+            Write-Host ""
+            Write-Host "===== $($file.FullName) ====="
+            Get-Content $file.FullName
+          }
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.asset_name }}
-          path: dist/${{ matrix.asset_name }}
+          name: ${{ matrix.asset }}
+          path: dist/${{ matrix.asset }}
 
   release:
     name: Publish GitHub Release
@@ -108,20 +142,20 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download Artifacts
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           path: artifacts
 
       - name: Assemble Release
         run: |
           mkdir release
+
           find artifacts -type f -exec cp {} release/ \;
 
           cp install.sh release/
           cp install.ps1 release/
 
-          echo "==== Release Files ===="
+          echo "===== Release Files ====="
           ls -lah release
 
       - name: Publish Release
@@ -135,4 +169,4 @@ jobs:
             release/install.sh \
             release/install.ps1 \
             --title "CommitDev CLI ${{ github.ref_name }}" \
-            --notes "Official CommitDev CLI release for Linux, macOS, and Windows."
+            --notes "Official CommitDev CLI release."
