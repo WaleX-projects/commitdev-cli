@@ -6,6 +6,8 @@ set -e
 # ==================================================
 
 REPO="WaleX-projects/commitdev-cli"
+BINARY_NAME="commitdev"
+TMP_DIR="/tmp"
 
 # ==================================================
 # Colors
@@ -28,52 +30,40 @@ echo "${DIM}──────────────────────�
 echo ""
 echo "• Detecting platform..."
 
-case "$(uname -s)" in
+OS_TYPE="$(uname -s)"
+case "$OS_TYPE" in
     Linux*)
         PLATFORM="Linux"
         ASSET_NAME="commitdev-linux"
-        BINARY_NAME="commitdev"
         INSTALL_DIR="/usr/local/bin"
-        TMP_FILE="/tmp/commitdev"
+        TMP_FILE="${TMP_DIR}/${BINARY_NAME}"
+        EXE_EXT=""
         ;;
     Darwin*)
         PLATFORM="macOS"
         ASSET_NAME="commitdev-macos"
-        BINARY_NAME="commitdev"
         INSTALL_DIR="/usr/local/bin"
-        TMP_FILE="/tmp/commitdev"
+        TMP_FILE="${TMP_DIR}/${BINARY_NAME}"
+        EXE_EXT=""
         ;;
-    MINGW*|MSYS*|CYGWIN*)
-        PLATFORM="Windows (Git Bash)"
+    MSYS*|MINGW*|CYGWIN*|Windows_NT*)
+        PLATFORM="Windows"
         ASSET_NAME="commitdev-windows.exe"
-        BINARY_NAME="commitdev.exe"
-        INSTALL_DIR="/usr/bin"
-        TMP_FILE="/tmp/commitdev.exe"
+        # Common local bin directory for Git Bash / MSYS environments
+        INSTALL_DIR="/usr/bin" 
+        TMP_FILE="${TMP_DIR}/${BINARY_NAME}.exe"
+        EXE_EXT=".exe"
         ;;
     *)
-        echo "  ${RED}✕ Unsupported operating system or shell environment.${RESET}"
+        echo "  ${RED}✕ Unsupported operating system: ${OS_TYPE}${RESET}"
         exit 1
         ;;
 esac
 
+# Finalize binary target name
+TARGET_BINARY="${BINARY_NAME}${EXE_EXT}"
+
 echo "  ${EMERALD}✓${RESET} ${PLATFORM}"
-
-# ==================================================
-# Check Write Permissions & Setup Sudo
-# ==================================================
-
-USE_SUDO=""
-if [ "$PLATFORM" != "Windows (Git Bash)" ]; then
-    # If we don't have write access to the directory, prep 'sudo'
-    if [ ! -w "$INSTALL_DIR" ]; then
-        if command -v sudo >/dev/null 2>&1; then
-            USE_SUDO="sudo"
-        else
-            echo "  ${RED}✕ Write permission denied for $INSTALL_DIR and sudo is not available.${RESET}"
-            exit 1
-        fi
-    fi
-fi
 
 # ==================================================
 # Check Existing Installation
@@ -86,7 +76,7 @@ CURRENT_VERSION=""
 
 if command -v "$BINARY_NAME" >/dev/null 2>&1; then
 
-    CURRENT_VERSION=$("$BINARY_NAME" --version \
+    CURRENT_VERSION=$("$BINARY_NAME" --version 2>/dev/null \
         | grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' \
         | head -1)
 
@@ -109,10 +99,17 @@ fi
 echo ""
 echo "• Checking latest release..."
 
-LATEST_VERSION=$(curl -fsSL \
-"https://api.github.com/repos/$REPO/releases/latest" \
-| grep '"tag_name":' \
-| sed -E 's/.*"([^"]+)".*/\1/')
+# Using curl with fallback to wget if not installed
+if command -v curl >/dev/null 2>&1; then
+    RELEASE_JSON=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest")
+elif command -v wget >/dev/null 2>&1; then
+    RELEASE_JSON=$(wget -qO- "https://api.github.com/repos/$REPO/releases/latest")
+else
+    echo "  ${RED}✕ Neither curl nor wget is installed.${RESET}"
+    exit 1
+fi
+
+LATEST_VERSION=$(echo "$RELEASE_JSON" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
 
 if [ -z "$LATEST_VERSION" ]; then
     echo "  ${RED}✕ Failed to determine the latest release.${RESET}"
@@ -150,8 +147,13 @@ echo "  ${DIM}›${RESET} Downloading release..."
 
 DOWNLOAD_URL="https://github.com/$REPO/releases/download/$LATEST_VERSION/$ASSET_NAME"
 
-curl -L -f "$DOWNLOAD_URL" -o "$TMP_FILE"
+if command -v curl >/dev/null 2>&1; then
+    curl -L -f "$DOWNLOAD_URL" -o "$TMP_FILE"
+else
+    wget -O "$TMP_FILE" "$DOWNLOAD_URL"
+fi
 
+# Make it executable inside the temp directory (non-critical on raw Windows but safe)
 chmod +x "$TMP_FILE"
 
 echo "  ${EMERALD}✓${RESET} Download complete."
@@ -162,10 +164,17 @@ echo "  ${EMERALD}✓${RESET} Download complete."
 
 echo "  ${DIM}›${RESET} Installing executable..."
 
-$USE_SUDO mv "$TMP_FILE" "$INSTALL_DIR/$BINARY_NAME"
-$USE_SUDO chmod +x "$INSTALL_DIR/$BINARY_NAME"
+# Use sudo only if running on UNIX/Linux/macOS and not already root.
+# Most Windows Git Bash environments don't have/need 'sudo' to write to /usr/bin.
+USE_SUDO=""
+if [ "$PLATFORM" != "Windows" ] && [ "$(id -u)" -ne 0 ]; then
+    USE_SUDO="sudo"
+fi
 
-echo "  ${EMERALD}✓${RESET} Installed to ${INSTALL_DIR}/${BINARY_NAME}"
+$USE_SUDO mv "$TMP_FILE" "$INSTALL_DIR/$TARGET_BINARY"
+$USE_SUDO chmod +x "$INSTALL_DIR/$TARGET_BINARY"
+
+echo "  ${EMERALD}✓${RESET} Installed to ${INSTALL_DIR}/${TARGET_BINARY}"
 
 # ==================================================
 # Initialize
@@ -174,7 +183,7 @@ echo "  ${EMERALD}✓${RESET} Installed to ${INSTALL_DIR}/${BINARY_NAME}"
 echo ""
 echo "• Initializing workspace..."
 
-"$INSTALL_DIR/$BINARY_NAME" setup
+"$INSTALL_DIR/$TARGET_BINARY" setup
 
 echo "  ${EMERALD}✓${RESET} Workspace initialized."
 
@@ -188,5 +197,5 @@ echo "${EMERALD}✓${RESET} CommitDev ${LATEST_VERSION} is ready."
 echo ""
 echo "Run:"
 echo ""
-echo "  ${BOLD}commitdev login${RESET}"
+echo "  ${BOLD}${BINARY_NAME} login${RESET}"
 echo ""
