@@ -40,9 +40,11 @@ jobs:
       run: |
         pyinstaller \
           --onefile \
+          --hidden-import="rich_pixels" /
           --hidden-import="commitdev.commands.analytics" \
           --hidden-import="commitdev.commands.auth" \
           --hidden-import="commitdev.commands.drafts" \
+          --hidden-import="commitdev.commands.drafter" \
           --hidden-import="commitdev.commands.integrations" \
           --hidden-import="commitdev.commands.posts" \
           --hidden-import="commitdev.commands.repos" \
@@ -59,6 +61,7 @@ jobs:
       run: |
         pyinstaller ^
           --onefile ^
+          --hidden-import="rich_pixels" ^
           --hidden-import="commitdev.commands.analytics" ^
           --hidden-import="commitdev.commands.auth" ^
           --hidden-import="commitdev.commands.drafts" ^
