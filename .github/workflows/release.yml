@@ -38,13 +38,38 @@ jobs:
     - name: Build Binary (Linux/macOS)
       if: matrix.os != 'windows-latest'
       run: |
-        pyinstaller --onefile --collect-submodules commitdev  --collect-submodules commitdev.commands --hidden-import="commitdev.commands.drafts" --add-data "commitdev/hooks:commitdev/hooks" commitdev/main.py --name ${{ matrix.asset_name }}
+        pyinstaller \
+          --onefile \
+          --hidden-import="commitdev.commands.analytics" \
+          --hidden-import="commitdev.commands.auth" \
+          --hidden-import="commitdev.commands.drafts" \
+          --hidden-import="commitdev.commands.integrations" \
+          --hidden-import="commitdev.commands.posts" \
+          --hidden-import="commitdev.commands.repos" \
+          --hidden-import="commitdev.commands.setup" \
+          --hidden-import="commitdev.commands.status" \
+          --add-data "commitdev/hooks:commitdev/hooks" \
+          commitdev/main.py \
+          --name ${{ matrix.asset_name }}
         chmod +x dist/${{ matrix.asset_name }}
 
     - name: Build Binary (Windows)
       if: matrix.os == 'windows-latest'
+      shell: cmd
       run: |
-        pyinstaller --onefile --collect-submodules commitdev --collect-submodules commitdev.commands --hidden-import="commitdev.commands.drafts" --add-data "commitdev/hooks;commitdev/hooks" commitdev/main.py --name ${{ matrix.asset_name }}
+        pyinstaller ^
+          --onefile ^
+          --hidden-import="commitdev.commands.analytics" ^
+          --hidden-import="commitdev.commands.auth" ^
+          --hidden-import="commitdev.commands.drafts" ^
+          --hidden-import="commitdev.commands.integrations" ^
+          --hidden-import="commitdev.commands.posts" ^
+          --hidden-import="commitdev.commands.repos" ^
+          --hidden-import="commitdev.commands.setup" ^
+          --hidden-import="commitdev.commands.status" ^
+          --add-data "commitdev/hooks;commitdev/hooks" ^
+          commitdev/main.py ^
+          --name ${{ matrix.asset_name }}
 
     - name: Stage Artifact for Assembly
       uses: actions/upload-artifact@v4
