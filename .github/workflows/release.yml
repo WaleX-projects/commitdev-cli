@@ -3,25 +3,21 @@ name: Build Cross-Platform CLI
 on:
   push:
     tags:
-      - 'v*' # Triggers on any version tag (e.g., v1.0.0, v1.1.4-beta)
+      - 'v*' # Triggers on ANY version tag style (e.g., 1.1.4 or v1.1.4)
 
 jobs:
   build:
-    name: Build Binary (${{ matrix.os }})
+    name: Build on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
             asset_name: commitdev-linux
-            sep: ":"
           - os: macos-latest
             asset_name: commitdev-macos
-            sep: ":"
           - os: windows-latest
             asset_name: commitdev-windows.exe
-            sep: ";"
 
     steps:
     - name: Checkout Repository
@@ -33,71 +29,67 @@ jobs:
         python-version: '3.10'
         cache: 'pip'
 
-    - name: Install Dependencies
+    - name: Install All Dependencies
       run: |
         python -m pip install --upgrade pip
+        # Included Pillow and rich-pixels so your inline image rendering system works natively
         pip install pyinstaller typer requests websockets python-dotenv Pillow rich-pixels setuptools setuptools-scm
-
-    - name: Compile Executable via PyInstaller
-      run: >
-        pyinstaller
-        --onefile
-        --collect-submodules commitdev
-        --add-data "commitdev/hooks${{ matrix.sep }}commitdev/hooks"
-        --name "${{ matrix.asset_name }}"
-        commitdev/main.py
-
-    - name: Ensure Executable Permissions (Linux/macOS)
+        
+    - name: Build Binary (Linux/macOS)
       if: matrix.os != 'windows-latest'
-      run: chmod +x "dist/${{ matrix.asset_name }}"
+      run: |
+        pyinstaller --onefile --collect-submodules commitdev --add-data "commitdev/hooks:commitdev/hooks" commitdev/main.py --name ${{ matrix.asset_name }}
+        chmod +x dist/${{ matrix.asset_name }}
 
-    - name: Upload Compiled Artifact
+    - name: Build Binary (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        pyinstaller --onefile --collect-submodules commitdev --add-data "commitdev/hooks;commitdev/hooks" commitdev/main.py --name ${{ matrix.asset_name }}
+
+    - name: Stage Artifact for Assembly
       uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.asset_name }}
         path: dist/${{ matrix.asset_name }}
-        retention-days: 2
 
   release:
-    name: Publish Production Release
+    name: Create Production Release Page
     needs: build
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-      
+      contents: write # Grants explicit permissions to generate release pages
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v4
 
-    - name: Download All Built Artifacts
+    - name: Download Compiled Assets
       uses: actions/download-artifact@v4
       with:
         path: distribution_vault
 
-    - name: Consolidate Release Assets
+    - name: Assemble Release Assets
       run: |
         mkdir -p dist_final
-        
-        # Flatten downloaded artifacts directly into the final delivery folder
-        find distribution_vault -type f -exec mv {} dist_final/ \;
-        
-        # Safely include helper installer scripts if present
-        for script in install.sh install.ps1; do
-          if [ -f "$script" ]; then
-            cp "$script" dist_final/
-            echo "Staged installer: $script"
-          fi
-        done
 
-        echo "--- Final Release Payload ---"
+        # Collect compiled binaries from all build runners
+        find distribution_vault -type f -exec mv {} dist_final/ \;
+
+        # Include installer scripts
+        [ -f install.sh ] && cp install.sh dist_final/
+        [ -f install.ps1 ] && cp install.ps1 dist_final/
+
+        echo "Release contents:"
         ls -lah dist_final
 
     - name: Publish GitHub Release
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        # Generates a clean release page and automatically attaches everything inside the final directory
         gh release create "${{ github.ref_name }}" \
-          dist_final/* \
+          dist_final/commitdev-linux \
+          dist_final/commitdev-macos \
+          dist_final/commitdev-windows.exe \
+          dist_final/install.sh \
+          dist_final/install.ps1 \
           --title "CommitDev CLI ${{ github.ref_name }}" \
-          --notes "Official cross-platform distribution binaries and setup scripts for CommitDev CLI."
+          --notes "Official CommitDev CLI release for Linux, macOS, and Windows."
