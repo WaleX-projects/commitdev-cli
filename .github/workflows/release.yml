@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   build:
-    name: Build (${{ matrix.os }})
+    name: Build on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -18,11 +18,16 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            asset: commitdev-linux
+            asset_name: commitdev-linux
+            data_sep: ":"
+
           - os: macos-latest
-            asset: commitdev-macos
+            asset_name: commitdev-macos
+            data_sep: ":"
+
           - os: windows-latest
-            asset: commitdev-windows.exe
+            asset_name: commitdev-windows.exe
+            data_sep: ";"
 
     steps:
       - name: Checkout Repository
@@ -32,26 +37,28 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.10"
-          cache: "pip"
+          cache: pip
 
-      - name: Install Dependencies
+      - name: Upgrade pip
+        run: python -m pip install --upgrade pip
+
+      - name: Install Project Dependencies
         run: |
-          python -m pip install --upgrade pip wheel setuptools
           pip install -r requirements.txt
           pip install pyinstaller
           pip install .
 
-      - name: Verify Project Structure (Linux/macOS)
+      - name: Show Repository Structure (Linux/macOS)
         if: runner.os != 'Windows'
         run: |
-          pwd
-          ls -la
+          echo "===== Repository ====="
           find commitdev -type f
 
-      - name: Verify Project Structure (Windows)
+      - name: Show Repository Structure (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
+          Write-Host "===== Repository ====="
           Get-ChildItem commitdev -Recurse
 
       - name: Build Binary (Linux/macOS)
@@ -61,19 +68,13 @@ jobs:
             --clean \
             --noconfirm \
             --onefile \
-            --collect-all commitdev \
             --collect-submodules commitdev \
-            --hidden-import commitdev.commands.auth \
-            --hidden-import commitdev.commands.status \
-            --hidden-import commitdev.commands.drafts \
-            --hidden-import commitdev.commands.posts \
-            --hidden-import commitdev.commands.repos \
-            --hidden-import commitdev.commands.analytics \
-            --hidden-import commitdev.commands.integrations \
-            --hidden-import commitdev.commands.setup \
-            --add-data "commitdev/hooks:commitdev/hooks" \
-            --name "${{ matrix.asset }}" \
+            --collect-all commitdev \
+            --add-data "commitdev/hooks${{ matrix.data_sep }}commitdev/hooks" \
+            --name "${{ matrix.asset_name }}" \
             commitdev/main.py
+
+          chmod +x dist/${{ matrix.asset_name }}
 
       - name: Build Binary (Windows)
         if: runner.os == 'Windows'
@@ -83,36 +84,28 @@ jobs:
             --clean `
             --noconfirm `
             --onefile `
-            --collect-all commitdev `
             --collect-submodules commitdev `
-            --hidden-import commitdev.commands.auth `
-            --hidden-import commitdev.commands.status `
-            --hidden-import commitdev.commands.drafts `
-            --hidden-import commitdev.commands.posts `
-            --hidden-import commitdev.commands.repos `
-            --hidden-import commitdev.commands.analytics `
-            --hidden-import commitdev.commands.integrations `
-            --hidden-import commitdev.commands.setup `
+            --collect-all commitdev `
             --add-data "commitdev/hooks;commitdev/hooks" `
-            --name "${{ matrix.asset }}" `
+            --name "${{ matrix.asset_name }}" `
             commitdev/main.py
 
-      - name: Show PyInstaller Warnings (Linux/macOS)
+      - name: Display PyInstaller Warnings (Linux/macOS)
         if: runner.os != 'Windows'
         run: |
           find build -name "warn-*.txt" -exec cat {} \; || true
 
-      - name: Show PyInstaller Warnings (Windows)
+      - name: Display PyInstaller Warnings (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           Get-ChildItem build -Recurse -Filter "warn-*.txt" | Get-Content
 
-      - name: Upload Artifact
+      - name: Upload Binary
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.asset }}
-          path: dist/${{ matrix.asset }}
+          name: ${{ matrix.asset_name }}
+          path: dist/${{ matrix.asset_name }}
 
   release:
     name: Publish GitHub Release
@@ -129,30 +122,56 @@ jobs:
       - name: Download Build Artifacts
         uses: actions/download-artifact@v4
         with:
-          path: artifacts
+          path: distribution_vault
 
-      - name: Assemble Release
+      - name: Assemble Release Assets
         run: |
-          mkdir release
+          mkdir -p release
 
-          find artifacts -type f -exec cp {} release/ \;
+          echo "Copying compiled binaries..."
+          find distribution_vault -type f -exec cp {} release/ \;
+
+          echo "Copying installer scripts..."
 
           if [ -f install.sh ]; then
             cp install.sh release/
+          else
+            echo "install.sh not found"
           fi
 
           if [ -f install.ps1 ]; then
             cp install.ps1 release/
+          else
+            echo "install.ps1 not found"
           fi
 
-          echo "Release Files:"
+          echo ""
+          echo "=============================="
+          echo "Release Contents"
+          echo "=============================="
           ls -lah release
 
-      - name: Publish Release
+      - name: Verify Release Assets
+        run: |
+          test -f release/commitdev-linux
+          test -f release/commitdev-macos
+          test -f release/commitdev-windows.exe
+
+      - name: Delete Existing Release (if any)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete "${{ github.ref_name }}" --yes --cleanup-tag || true
+
+      - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release create "${{ github.ref_name }}" \
-            release/* \
-            --title "CommitDev ${{ github.ref_name }}" \
-            --notes "Official CommitDev CLI Release"
+            release/commitdev-linux \
+            release/commitdev-macos \
+            release/commitdev-windows.exe \
+            release/install.sh \
+            release/install.ps1 \
+            --title "CommitDev CLI ${{ github.ref_name }}" \
+            --notes "Official CommitDev CLI release for Linux, macOS, and Windows."
