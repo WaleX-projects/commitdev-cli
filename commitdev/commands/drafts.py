@@ -42,9 +42,6 @@ commitdev_theme = Theme({
 
 console = Console(theme=commitdev_theme, highlight=False)
 
-# Initialize Typer App CLI Router
-app = typer.Typer(help="CommitDev CLI Drafts Controller Management Console")
-
 
 # ──────────────────────────────────────────────────────────
 # STANDARD CLI COMMAND HANDLERS
