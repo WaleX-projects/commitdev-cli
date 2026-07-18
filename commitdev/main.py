@@ -111,7 +111,11 @@ from commitdev.commands.analytics import analytics
 from commitdev.commands.integrations import integrations
 
 from commitdev.commands.drafter import (
-    test_draft
+    drafts,
+    draft,
+    approve,
+    regenerate,
+    listen_for_drafts
 )
 
 # ==========================================
@@ -158,14 +162,13 @@ app.command()(activity)
 # ==========================================
 # Drafts
 # ==========================================
-"""
+
 app.command()(drafts)
 app.command()(draft)
 app.command()(approve)
 app.command()(regenerate)
 app.command()(listen_for_drafts)
-"""
-app.command()(test_draft)
+
 # ==========================================
 # Posts
 # ==========================================
