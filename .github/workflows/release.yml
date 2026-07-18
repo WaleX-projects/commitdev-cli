@@ -44,10 +44,17 @@ jobs:
 
       - name: Install Project Dependencies
         run: |
-          pip install -r requirements.txt
-          pip install pyinstaller
-          pip install .
-
+          pip install \
+            pyinstaller \
+            typer \
+            requests \
+            websockets \
+            python-dotenv \
+            Pillow \
+            rich-pixels \
+            setuptools \
+            setuptools-scm
+            
       - name: Show Repository Structure (Linux/macOS)
         if: runner.os != 'Windows'
         run: |
