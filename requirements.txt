@@ -2,7 +2,7 @@ altgraph==0.17.5
 annotated-doc==0.0.4
 certifi==2026.6.17
 charset-normalizer==3.4.7
--e git+ssh://git@github.com/WaleX-projects/commitdev-cli.git@977a244cf3e71f4146b02514d341781e20d08d3b#egg=commitdev
+commitdev @ file:///home/ubuntu/commitdev-cli
 idna==3.18
 markdown-it-py==4.2.0
 mdurl==0.1.2
