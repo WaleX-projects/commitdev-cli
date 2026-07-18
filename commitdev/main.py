@@ -83,14 +83,14 @@ from commitdev.commands.status import (
     
 )
 
-from commitdev.commands.drafts import (
+""""from commitdev.commands.drafts import (
     drafts,
     draft,
     approve,
     regenerate,
     listen_for_drafts,
 )
-
+"""
 from commitdev.commands.posts import (
     posts,
     post,
@@ -154,12 +154,13 @@ app.command()(activity)
 # ==========================================
 # Drafts
 # ==========================================
+"""
 app.command()(drafts)
 app.command()(draft)
 app.command()(approve)
 app.command()(regenerate)
 app.command()(listen_for_drafts)
-
+"""
 # ==========================================
 # Posts
 # ==========================================
