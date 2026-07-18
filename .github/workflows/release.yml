@@ -18,16 +18,13 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            asset_name: commitdev-linux
-            data_sep: ":"
+            asset: commitdev-linux
 
           - os: macos-latest
-            asset_name: commitdev-macos
-            data_sep: ":"
+            asset: commitdev-macos
 
           - os: windows-latest
-            asset_name: commitdev-windows.exe
-            data_sep: ";"
+            asset: commitdev-windows.exe
 
     steps:
       - name: Checkout Repository
@@ -39,11 +36,15 @@ jobs:
           python-version: "3.10"
           cache: pip
 
-      - name: Upgrade pip
-        run: python -m pip install --upgrade pip
-
-      - name: Install Project Dependencies
+      ####################################################
+      # LINUX + MACOS
+      ####################################################
+      - name: Install Dependencies (Linux/macOS)
+        if: runner.os != 'Windows'
+        shell: bash
         run: |
+          python -m pip install --upgrade pip
+
           pip install \
             pyinstaller \
             typer \
@@ -54,126 +55,126 @@ jobs:
             rich-pixels \
             setuptools \
             setuptools-scm
-            
-      - name: Show Repository Structure (Linux/macOS)
-        if: runner.os != 'Windows'
-        run: |
-          echo "===== Repository ====="
-          find commitdev -type f
 
-      - name: Show Repository Structure (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          Write-Host "===== Repository ====="
-          Get-ChildItem commitdev -Recurse
+          pip install .
 
       - name: Build Binary (Linux/macOS)
         if: runner.os != 'Windows'
+        shell: bash
         run: |
           pyinstaller \
             --clean \
             --noconfirm \
             --onefile \
             --collect-submodules commitdev \
-            --collect-all commitdev \
-            --add-data "commitdev/hooks${{ matrix.data_sep }}commitdev/hooks" \
-            --name "${{ matrix.asset_name }}" \
+            --add-data "commitdev/hooks:commitdev/hooks" \
+            --name "${{ matrix.asset }}" \
             commitdev/main.py
 
-          chmod +x dist/${{ matrix.asset_name }}
+          chmod +x dist/${{ matrix.asset }}
+
+      ####################################################
+      # WINDOWS
+      ####################################################
+      - name: Install Dependencies (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+
+          python -m pip install `
+            pyinstaller `
+            typer `
+            requests `
+            websockets `
+            python-dotenv `
+            Pillow `
+            rich-pixels `
+            setuptools `
+            setuptools-scm
+
+          python -m pip install .
 
       - name: Build Binary (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          pyinstaller `
+          python -m PyInstaller `
             --clean `
             --noconfirm `
             --onefile `
             --collect-submodules commitdev `
-            --collect-all commitdev `
             --add-data "commitdev/hooks;commitdev/hooks" `
-            --name "${{ matrix.asset_name }}" `
+            --name "${{ matrix.asset }}" `
             commitdev/main.py
 
-      - name: Display PyInstaller Warnings (Linux/macOS)
-        if: runner.os != 'Windows'
+      ####################################################
+      # DEBUG
+      ####################################################
+      - name: Show PyInstaller warnings (Linux/macOS)
+        if: always() && runner.os != 'Windows'
+        shell: bash
         run: |
           find build -name "warn-*.txt" -exec cat {} \; || true
 
-      - name: Display PyInstaller Warnings (Windows)
-        if: runner.os == 'Windows'
+      - name: Show PyInstaller warnings (Windows)
+        if: always() && runner.os == 'Windows'
         shell: pwsh
         run: |
-          Get-ChildItem build -Recurse -Filter "warn-*.txt" | Get-Content
+          Get-ChildItem build -Recurse -Filter "warn-*.txt" |
+          ForEach-Object {
+            Write-Host "----- $($_.FullName) -----"
+            Get-Content $_.FullName
+          }
 
+      ####################################################
+      # UPLOAD
+      ####################################################
       - name: Upload Binary
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.asset_name }}
-          path: dist/${{ matrix.asset_name }}
+          name: ${{ matrix.asset }}
+          path: dist/${{ matrix.asset }}
 
   release:
     name: Publish GitHub Release
     needs: build
     runs-on: ubuntu-latest
 
-    permissions:
-      contents: write
-
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Download Build Artifacts
+      - name: Download Artifacts
         uses: actions/download-artifact@v4
         with:
-          path: distribution_vault
+          path: artifacts
 
-      - name: Assemble Release Assets
+      - name: Assemble Release
+        shell: bash
         run: |
-          mkdir -p release
+          mkdir release
 
-          echo "Copying compiled binaries..."
-          find distribution_vault -type f -exec cp {} release/ \;
-
-          echo "Copying installer scripts..."
+          find artifacts -type f -exec cp {} release/ \;
 
           if [ -f install.sh ]; then
             cp install.sh release/
-          else
-            echo "install.sh not found"
           fi
 
           if [ -f install.ps1 ]; then
             cp install.ps1 release/
-          else
-            echo "install.ps1 not found"
           fi
 
-          echo ""
-          echo "=============================="
-          echo "Release Contents"
-          echo "=============================="
+          echo "Release contents:"
           ls -lah release
 
-      - name: Verify Release Assets
-        run: |
-          test -f release/commitdev-linux
-          test -f release/commitdev-macos
-          test -f release/commitdev-windows.exe
-
-      - name: Delete Existing Release (if any)
+      - name: Publish Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
         run: |
-          gh release delete "${{ github.ref_name }}" --yes --cleanup-tag || true
+          gh release delete "${{ github.ref_name }}" --yes || true
 
-      - name: Publish GitHub Release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
           gh release create "${{ github.ref_name }}" \
             release/commitdev-linux \
             release/commitdev-macos \
@@ -181,4 +182,4 @@ jobs:
             release/install.sh \
             release/install.ps1 \
             --title "CommitDev CLI ${{ github.ref_name }}" \
-            --notes "Official CommitDev CLI release for Linux, macOS, and Windows."
+            --notes "Official CommitDev CLI release for Linux, macOS and Windows."
