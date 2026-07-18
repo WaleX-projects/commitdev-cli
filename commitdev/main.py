@@ -110,6 +110,10 @@ from commitdev.commands.setup import (
 from commitdev.commands.analytics import analytics
 from commitdev.commands.integrations import integrations
 
+from commitdev.commands.drafter import (
+    test_draft
+)
+
 # ==========================================
 # CLI
 # ==========================================
@@ -161,6 +165,7 @@ app.command()(approve)
 app.command()(regenerate)
 app.command()(listen_for_drafts)
 """
+app.command()(test_draft)
 # ==========================================
 # Posts
 # ==========================================
