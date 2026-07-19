@@ -45,8 +45,9 @@ def version_callback(value: bool):
 # ==========================================
 # Global Error Handler
 # ==========================================
+"""
 def commitdev_exception_handler(exc_type, exc_value, exc_traceback):
-    """Intercept raw exceptions and display a clean CommitDev error."""
+ #   ntercept raw exceptions and display a clean CommitDev error.
 
     if issubclass(exc_type, KeyboardInterrupt):
         sys.__excepthook__(exc_type, exc_value, exc_traceback)
@@ -66,6 +67,7 @@ def commitdev_exception_handler(exc_type, exc_value, exc_traceback):
 
 
 sys.excepthook = commitdev_exception_handler
+"""
 
 # ==========================================
 # Commands
@@ -88,7 +90,7 @@ from commitdev.commands.drafts import (
     draft,
     approve,
     regenerate,
-    listen_for_drafts,
+    
 )
 
 from commitdev.commands.posts import (
@@ -109,7 +111,7 @@ from commitdev.commands.setup import (
 
 from commitdev.commands.analytics import analytics
 from commitdev.commands.integrations import integrations
-
+from commitdev.commands.publishing import listen_for_drafts
 
 
 # ==========================================
@@ -161,7 +163,7 @@ app.command()(drafts)
 app.command()(draft)
 app.command()(approve)
 app.command()(regenerate)
-#app.command()(listen_for_drafts)
+app.command()(listen_for_drafts)
 
 # ==========================================
 # Posts
