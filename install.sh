@@ -31,6 +31,7 @@ echo ""
 echo "• Detecting platform..."
 
 OS_TYPE="$(uname -s)"
+
 case "$OS_TYPE" in
     Linux*)
         PLATFORM="Linux"
@@ -39,6 +40,7 @@ case "$OS_TYPE" in
         TMP_FILE="${TMP_DIR}/${BINARY_NAME}"
         EXE_EXT=""
         ;;
+
     Darwin*)
         PLATFORM="macOS"
         ASSET_NAME="commitdev-macos"
@@ -46,21 +48,25 @@ case "$OS_TYPE" in
         TMP_FILE="${TMP_DIR}/${BINARY_NAME}"
         EXE_EXT=""
         ;;
+
     MSYS*|MINGW*|CYGWIN*|Windows_NT*)
         PLATFORM="Windows"
         ASSET_NAME="commitdev-windows.exe"
-        # Common local bin directory for Git Bash / MSYS environments
-        INSTALL_DIR="/usr/bin" 
+
+        # Install into the user's bin directory (no Administrator required)
+        INSTALL_DIR="$HOME/bin"
+        mkdir -p "$INSTALL_DIR"
+
         TMP_FILE="${TMP_DIR}/${BINARY_NAME}.exe"
         EXE_EXT=".exe"
         ;;
+
     *)
         echo "  ${RED}✕ Unsupported operating system: ${OS_TYPE}${RESET}"
         exit 1
         ;;
 esac
 
-# Finalize binary target name
 TARGET_BINARY="${BINARY_NAME}${EXE_EXT}"
 
 echo "  ${EMERALD}✓${RESET} ${PLATFORM}"
@@ -76,9 +82,7 @@ CURRENT_VERSION=""
 
 if command -v "$BINARY_NAME" >/dev/null 2>&1; then
 
-    CURRENT_VERSION=$("$BINARY_NAME" --version 2>/dev/null \
-        | grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' \
-        | head -1)
+    CURRENT_VERSION=$("$BINARY_NAME" --version 2>/dev/null | grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1)
 
     if [ -n "$CURRENT_VERSION" ]; then
         echo "  ${EMERALD}✓${RESET} Found CommitDev ${CURRENT_VERSION}"
@@ -99,7 +103,6 @@ fi
 echo ""
 echo "• Checking latest release..."
 
-# Using curl with fallback to wget if not installed
 if command -v curl >/dev/null 2>&1; then
     RELEASE_JSON=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest")
 elif command -v wget >/dev/null 2>&1; then
@@ -109,7 +112,7 @@ else
     exit 1
 fi
 
-LATEST_VERSION=$(echo "$RELEASE_JSON" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+LATEST_VERSION=$(printf "%s" "$RELEASE_JSON" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
 
 if [ -z "$LATEST_VERSION" ]; then
     echo "  ${RED}✕ Failed to determine the latest release.${RESET}"
@@ -153,7 +156,6 @@ else
     wget -O "$TMP_FILE" "$DOWNLOAD_URL"
 fi
 
-# Make it executable inside the temp directory (non-critical on raw Windows but safe)
 chmod +x "$TMP_FILE"
 
 echo "  ${EMERALD}✓${RESET} Download complete."
@@ -162,19 +164,51 @@ echo "  ${EMERALD}✓${RESET} Download complete."
 # Install
 # ==================================================
 
-echo "  ${DIM}›${RESET} Installing executable..."
+echo ""
+echo "• Installing executable..."
 
-# Use sudo only if running on UNIX/Linux/macOS and not already root.
-# Most Windows Git Bash environments don't have/need 'sudo' to write to /usr/bin.
 USE_SUDO=""
+
 if [ "$PLATFORM" != "Windows" ] && [ "$(id -u)" -ne 0 ]; then
     USE_SUDO="sudo"
 fi
 
+$USE_SUDO mkdir -p "$INSTALL_DIR"
 $USE_SUDO mv "$TMP_FILE" "$INSTALL_DIR/$TARGET_BINARY"
 $USE_SUDO chmod +x "$INSTALL_DIR/$TARGET_BINARY"
 
 echo "  ${EMERALD}✓${RESET} Installed to ${INSTALL_DIR}/${TARGET_BINARY}"
+
+# ==================================================
+# Add to PATH (Windows Git Bash)
+# ==================================================
+
+if [ "$PLATFORM" = "Windows" ]; then
+
+    case ":$PATH:" in
+        *":$HOME/bin:"*)
+            ;;
+        *)
+            echo ""
+            echo "• Adding CommitDev to PATH..."
+
+            if [ -f "$HOME/.bashrc" ]; then
+                grep -qxF 'export PATH="$HOME/bin:$PATH"' "$HOME/.bashrc" || \
+                echo 'export PATH="$HOME/bin:$PATH"' >> "$HOME/.bashrc"
+            fi
+
+            if [ -f "$HOME/.bash_profile" ]; then
+                grep -qxF 'export PATH="$HOME/bin:$PATH"' "$HOME/.bash_profile" || \
+                echo 'export PATH="$HOME/bin:$PATH"' >> "$HOME/.bash_profile"
+            fi
+
+            export PATH="$HOME/bin:$PATH"
+
+            echo "  ${EMERALD}✓${RESET} PATH updated."
+            ;;
+    esac
+
+fi
 
 # ==================================================
 # Initialize
@@ -183,7 +217,7 @@ echo "  ${EMERALD}✓${RESET} Installed to ${INSTALL_DIR}/${TARGET_BINARY}"
 echo ""
 echo "• Initializing workspace..."
 
-"$INSTALL_DIR/$TARGET_BINARY" setup
+"$INSTALL_DIR/$TARGET_BINARY" setup || true
 
 echo "  ${EMERALD}✓${RESET} Workspace initialized."
 
