@@ -1,4 +1,3 @@
-
 # ─── STANDARD LIBRARY IMPORTS ───────────────────────────────────────
 import asyncio
 import io
@@ -42,14 +41,10 @@ commitdev_theme = Theme({
 
 console = Console(theme=commitdev_theme, highlight=False)
 
-# Initialize Typer App CLI Router
-app = typer.Typer(help="CommitDev CLI Drafts Controller Management Console")
-
 
 # ──────────────────────────────────────────────────────────
 # STANDARD CLI COMMAND HANDLERS
 # ──────────────────────────────────────────────────────────
-
 
 def drafts():
     """List all of your CommitDev drafts."""
@@ -82,7 +77,6 @@ def drafts():
         )
 
     console.print("[meta]──────────────────────────────────────────────────[/meta]\n")
-
 
 
 def draft(id: int):
@@ -120,25 +114,8 @@ def approve(id: int):
         try:
             data = post(f"/cli/drafts/{id}/approve/")
             console.print(f"  [success]✓[/success] Draft node [white]#{data.get('draft_id')}[/white] locked into deployment sequence successfully.\n")
-            
-            targets = data.get("targets", [])
-            if targets:
-                console.print("[meta]Deployment Targets:[/meta]")
-                for target in targets:
-                    platform = target.get("platform", "Unknown").title()
-                    status = target.get("status", "pending")
-                    url = target.get("url")
-                    
-                    if status == "success" and url:
-                        console.print(f"  • [green]{platform}[/green]: [link={url}]{url}[/link]")
-                    elif status == "failed":
-                        console.print(f"  • [red]{platform}[/red]: ✕ Failed to publish")
-                    else:
-                        console.print(f"  • [yellow]{platform}[/yellow]: Processing ({status})")
-                console.print("")
         except Exception as e:
             console.print(f"  [error]✕ Authorization payload dropped:[/error] [meta]{e}[/meta]\n")
-
 
 
 def regenerate(id: int):
@@ -152,7 +129,4 @@ def regenerate(id: int):
             console.print(f"  [success]✓[/success] {data.get('message')}\n")
         except Exception as e:
             console.print(f"  [error]✕ Model context rewrite failed:[/error] [meta]{e}[/meta]\n")
-
-
-
 
