@@ -7,7 +7,7 @@ from typing import Dict, List, Optional
 import websockets
 from rich.console import Console
 
-from commitdev.console import console as shared_console
+from .console import console as shared_console
 
 
 @dataclass
