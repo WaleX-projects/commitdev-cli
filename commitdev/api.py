@@ -3,7 +3,7 @@ from commitdev.config import get_token
 
 BASE_URL = "https://tryfit.ddns.net/api"
 
-
+BASE_URL_WSS = "wss://tryfit.ddns.net/ws"
 def _headers():
     token_data = get_token()
     

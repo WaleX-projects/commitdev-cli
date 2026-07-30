@@ -1,16 +1,16 @@
 import asyncio
-
+import sys
 import typer
 
 from commitdev.config import get_token
-
+from commitdev.api import BASE_URL_WSS
 from commitdev.pipeline.context import PipelineContext
 from commitdev.pipeline.websocket import WebSocketClient
 from commitdev.pipeline.review import ReviewHub
 from commitdev.pipeline.draft_flow import DraftFlow
 from commitdev.pipeline.images import ImageManager
 from commitdev.pipeline.publisher import Publisher
-
+from commitdev.pipeline.console import console
 def fetch_fresh_token():
     """Retrieves local authentication credential token mappings."""
     try:
@@ -27,7 +27,7 @@ def fetch_fresh_token():
 async def run():
 
     token = fetch_fresh_token()
-    WS_URL = f"wss://commitdev.name.ng/ws/drafts/?token={token}"
+    WS_URL = f"{BASE_URL_WSS}/drafts/?token={token}"
     
     
     client = WebSocketClient(
