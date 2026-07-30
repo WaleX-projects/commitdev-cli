@@ -45,9 +45,8 @@ def version_callback(value: bool):
 # ==========================================
 # Global Error Handler
 # ==========================================
-"""
 def commitdev_exception_handler(exc_type, exc_value, exc_traceback):
- #   ntercept raw exceptions and display a clean CommitDev error.
+    '''Intercept raw exceptions and display a clean CommitDev error.'''
 
     if issubclass(exc_type, KeyboardInterrupt):
         sys.__excepthook__(exc_type, exc_value, exc_traceback)
@@ -67,7 +66,7 @@ def commitdev_exception_handler(exc_type, exc_value, exc_traceback):
 
 
 sys.excepthook = commitdev_exception_handler
-"""
+
 
 # ==========================================
 # Commands
