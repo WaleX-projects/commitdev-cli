@@ -1,7 +1,7 @@
 import requests
 from commitdev.config import get_token
 
-BASE_URL = "https://commitdev.name.ng/api"
+BASE_URL = "https://tryfit.ddns.net/api"
 
 
 def _headers():
