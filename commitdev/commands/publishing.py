@@ -89,7 +89,7 @@ async def run():
                 break
 
 
-def listen_for_drafts():
+def watch():
     """
     Long-running websocket worker.
     """

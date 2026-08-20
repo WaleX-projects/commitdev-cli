@@ -45,7 +45,7 @@ def analytics():
         repo_name = repo.get('name', '-')
         # Structured alignment display layout
         console.print(
-            f"  [meta]›[/meta] [white]{repo_name:<24}[/white] "
+            f"[meta]›[/meta] [white]{repo_name:<24}[/white] "
             f"[meta]│[/meta] Posts: {repo.get('posts', 0):<3} "
             f"[meta]│[/meta] Engagement: [success]{repo.get('engagement', 0)}[/success]"
         )

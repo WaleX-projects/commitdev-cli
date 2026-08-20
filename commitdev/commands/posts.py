@@ -15,8 +15,10 @@ commitdev_theme = Theme({
 
 console = Console(theme=commitdev_theme, highlight=False)
 
+app = typer.Typer(help="Manage published posts")
 
-def posts():
+@app.command("list")
+def list_posts():
     """
     List your published CommitDev posts.
 
@@ -54,7 +56,7 @@ def posts():
 
     console.print("[meta]──────────────────────────────────────────────────[/meta]\n")
 
-
+@app.command("show")
 def post(id: int):
     """
     Show the details and performance of a published post.

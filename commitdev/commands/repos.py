@@ -15,8 +15,10 @@ commitdev_theme = Theme({
 
 console = Console(theme=commitdev_theme, highlight=False)
 
+app = typer.Typer(help="Manage connected repositories")
 
-def repos():
+@app.command('list')
+def list_repos():
     """
     List all repositories connected to your CommitDev account.
 
@@ -49,8 +51,8 @@ def repos():
 
     console.print("[meta]──────────────────────────────────────────────────[/meta]\n")
 
-
-def repo(id: int):
+@app.command('show')
+def show_repo(id: int):
     """
     Show detailed information about a connected repository.
 
@@ -81,8 +83,8 @@ def repo(id: int):
     console.print(f"  Published Posts  [meta]›[/meta] [success]{data.get('posts', 0)}[/success]")
     console.print("[meta]──────────────────────────────────────────────────[/meta]\n")
 
-
-def sync(id: int):
+@app.command('sync')
+def sync_repo(id: int):
     """
     Synchronize a repository with CommitDev.
 

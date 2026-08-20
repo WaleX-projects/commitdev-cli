@@ -50,6 +50,7 @@ def commitdev_exception_handler(exc_type, exc_value, exc_traceback):
 
     if issubclass(exc_type, KeyboardInterrupt):
         sys.__excepthook__(exc_type, exc_value, exc_traceback)
+        print(sys.__excepthook__(exc_type, exc_value, exc_traceback))
         return
 
     console.print(
@@ -84,24 +85,9 @@ from commitdev.commands.status import (
     
 )
 
-from commitdev.commands.drafts import (
-    drafts,
-    draft,
-    approve,
-    regenerate,
-    
-)
-
-from commitdev.commands.posts import (
-    posts,
-    post,
-)
-
-from commitdev.commands.repos import (
-    repos,
-    repo,
-    sync,
-)
+from commitdev.commands import drafts 
+from commitdev.commands import posts
+from commitdev.commands import repos
 
 from commitdev.commands.setup import (
     setup,
@@ -109,8 +95,8 @@ from commitdev.commands.setup import (
 )
 
 from commitdev.commands.analytics import analytics
-from commitdev.commands.integrations import integrations
-from commitdev.commands.publishing import listen_for_drafts
+from commitdev.commands import integrations
+from commitdev.commands.publishing import watch 
 
 
 # ==========================================
@@ -139,6 +125,12 @@ def main(
     pass
 
 
+
+
+app.add_typer(repos.app, name="repo")
+app.add_typer(drafts.app, name="draft")
+app.add_typer(posts.app, name="post")
+app.add_typer(integrations.app, name="integrations")
 # ==========================================
 # Authentication
 # ==========================================
@@ -157,25 +149,27 @@ app.command()(activity)
 # ==========================================
 # Drafts
 # ==========================================
-
+"""
 app.command()(drafts)
 app.command()(draft)
 app.command()(approve)
 app.command()(regenerate)
-app.command()(listen_for_drafts)
+"""
+app.command()(watch )
 
 # ==========================================
 # Posts
 # ==========================================
+"""
 app.command()(posts)
 app.command()(post)
-
+"""
 # ==========================================
 # Repositories
 # ==========================================
-app.command()(repos)
-app.command()(repo)
-app.command()(sync)
+#app.command()(repos)
+#app.command()(repo)
+#app.command()(sync)
 
 # ==========================================
 # Analytics
@@ -185,7 +179,7 @@ app.command()(analytics)
 # ==========================================
 # Integrations
 # ==========================================
-app.command()(integrations)
+#app.command()(integrations)
 
 # ==========================================
 # Setup & Uninstall

@@ -95,11 +95,11 @@ git() {
 
         if [ $push_status -eq 0 ]; then
 
-            if echo "$commit_msg" | grep -iq "\[post\]"; then
+            if echo "$commit_msg" | grep -iq "\\[post\\]"; then
 
                 echo -e "\n\033[1;35m📡 Code is safe on GitHub. Time to tell the story...\033[0m"
 
-                commitdev listen-for-drafts
+                commitdev watch
 
             else
 

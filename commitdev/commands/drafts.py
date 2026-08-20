@@ -40,13 +40,15 @@ commitdev_theme = Theme({
 })
 
 console = Console(theme=commitdev_theme, highlight=False)
+app = typer.Typer(help="Manage AI-generated drafts")
 
 
 # ──────────────────────────────────────────────────────────
 # STANDARD CLI COMMAND HANDLERS
 # ──────────────────────────────────────────────────────────
 
-def drafts():
+@app.command("list")
+def list_draft():
     """List all of your CommitDev drafts."""
     console.print("\n[brand]CommitDev[/brand] [meta]•[/meta] Staged Drafts")
     console.print("[meta]──────────────────────────────────────────────────[/meta]")
@@ -78,8 +80,8 @@ def drafts():
 
     console.print("[meta]──────────────────────────────────────────────────[/meta]\n")
 
-
-def draft(id: int):
+@app.command("show")
+def show_draft(id: int):
     """Show the details of a specific draft."""
     console.print(f"\n[brand]CommitDev[/brand] [meta]•[/meta] Draft Blueprint #{id}")
     console.print("[meta]──────────────────────────────────────────────────[/meta]")
@@ -105,7 +107,8 @@ def draft(id: int):
     console.print("[meta]──────────────────────────────────────────────────[/meta]\n")
 
 
-def approve(id: int):
+@app.command("approve")
+def approve_draft(id: int):
     """Approve a draft for publishing."""
     console.print(f"\n[brand]CommitDev[/brand] [meta]•[/meta] Publication Approval")
     console.print("[meta]──────────────────────────────────────────────────[/meta]")
@@ -117,8 +120,8 @@ def approve(id: int):
         except Exception as e:
             console.print(f"  [error]✕ Authorization payload dropped:[/error] [meta]{e}[/meta]\n")
 
-
-def regenerate(id: int):
+@app.command("regenerate")
+def regenerate_draft(id: int):
     """Generate a new version of an existing draft."""
     console.print(f"\n[brand]CommitDev[/brand] [meta]•[/meta] AI Reconstruction Loop")
     console.print("[meta]──────────────────────────────────────────────────[/meta]")
@@ -130,3 +133,6 @@ def regenerate(id: int):
         except Exception as e:
             console.print(f"  [error]✕ Model context rewrite failed:[/error] [meta]{e}[/meta]\n")
 
+
+
+#Note: Add a new command NAMED: edit_draft for editing draft

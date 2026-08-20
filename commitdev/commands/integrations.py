@@ -14,8 +14,10 @@ commitdev_theme = Theme({
 })
 
 console = Console(theme=commitdev_theme, highlight=False)
+app = typer.Typer(help="Manage integrations of socal media")
 
-def integrations():
+@app.command("list")
+def list_integrations():
     """
     Show the status of your connected publishing integrations.
 
@@ -53,3 +55,15 @@ def integrations():
     
     # Summary line tracking total links active
     console.print(f"Active Channels [meta]›[/meta] [success]{connected_count}[/success] [meta]/ {len(data)} configured[/meta]\n")
+
+
+@app.command("connect")
+def connect_platform(plaform_id:str):
+    pass
+
+
+@app.command("disconnect")
+def disconnect_platform(plaform_id:str):
+    pass
+
+#Note Adding Two more command Named: commitdev integration list / connect / disconnect
