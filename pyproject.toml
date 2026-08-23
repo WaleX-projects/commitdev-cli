@@ -14,7 +14,7 @@ dependencies = [
 ]
 
 [project.scripts]
-commitdev = "commitdev.main:app"
+cdv = "commitdev.main:app"
 
 [tool.setuptools_scm]
 version_scheme = "no-guess-dev"

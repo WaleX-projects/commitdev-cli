@@ -7,17 +7,11 @@ import typer
 from rich.console import Console
 from rich.theme import Theme
 import subprocess 
-commitdev_theme = Theme({
-    "brand": "bold spring_green3",
-    "success": "spring_green3",
-    "meta": "dim grey39",
-    "command": "bold white",
-       "warn": "bold yellow",
-    "error": "bold red"
-})
+from commitdev.pipeline.console import console
+
 
 app = typer.Typer()
-console = Console(theme=commitdev_theme, highlight=False)
+
 
 def get_bundle_path():
     if hasattr(sys, '_MEIPASS'):

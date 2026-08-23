@@ -35,7 +35,7 @@ class DraftFlow:
     # Edit Draft
     # --------------------------------------------------
 
-    async def edit(self):
+    async def edit(self,draft_id = None):
         platform = self.choose_platform()
 
         if platform is None:
@@ -43,6 +43,8 @@ class DraftFlow:
 
         key = platform.lower()
 
+        if draft_id:
+            current = 
         current = self.ctx.posts_by_platform.get(key, "")
 
         template = (

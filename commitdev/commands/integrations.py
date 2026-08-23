@@ -2,18 +2,8 @@ import typer
 from rich.console import Console
 from rich.theme import Theme
 from commitdev.api import get
+from commitdev.pipeline.console import console
 
-# Official CommitDev styling engine matching your custom UI
-commitdev_theme = Theme({
-    "brand": "bold spring_green3",   # Primary mint/emerald color signature
-    "success": "spring_green3",
-    "meta": "dim grey39",            # Secondary layout accent gray 
-    "command": "bold white",
-    "error": "bold red",
-    "warn": "bold yellow"
-})
-
-console = Console(theme=commitdev_theme, highlight=False)
 app = typer.Typer(help="Manage integrations of socal media")
 
 @app.command("list")

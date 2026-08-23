@@ -15,31 +15,22 @@ from urllib.parse import urlparse
 from PIL import Image
 import typer
 import websockets
-from rich.console import Console
 from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn
-from rich.theme import Theme
+
 from rich_pixels import Pixels
 from rich.panel import Panel
 
 # ─── LOCAL INTERNAL CORE APP IMPORTS ───────────────────────────────
-from commitdev.api import get, post
+from commitdev.api import get, post, BASE_URL_WSS
 from commitdev.config import get_token
-
+from commitdev.pipeline.console import console
 import shutil
 from rich.text import Text
 from rich.style import Style
-
-# Official CommitDev layout configurations matching your product dashboard theme
-commitdev_theme = Theme({
-    "brand": "bold spring_green3",   # Signature mint/emerald color
-    "success": "spring_green3",
-    "meta": "dim grey39",            # Secondary layout dark slate grey text
-    "command": "bold white",
-    "error": "bold red",
-    "warn": "bold yellow"
-})
-
-console = Console(theme=commitdev_theme, highlight=False)
+from .publishing import fetch_fresh_token
+from commitdev.pipeline.context import PipelineContext
+from commitdev.pipeline.websocket import WebSocketClient
+from commitdev.pipeline.draft_flow import DraftFlow
 app = typer.Typer(help="Manage AI-generated drafts")
 
 
@@ -107,6 +98,9 @@ def show_draft(id: int):
     console.print("[meta]──────────────────────────────────────────────────[/meta]\n")
 
 
+
+
+
 @app.command("approve")
 def approve_draft(id: int):
     """Approve a draft for publishing."""
@@ -133,6 +127,12 @@ def regenerate_draft(id: int):
         except Exception as e:
             console.print(f"  [error]✕ Model context rewrite failed:[/error] [meta]{e}[/meta]\n")
 
+@app.command("edit")
+def edit_draft(draft_id: int):
+    console.print(f"\n[brand]CommitDev[/brand] [meta]•[/meta] Editing  Draft #{draft_id} ")
+    console.print("[meta]──────────────────────────────────────────────────[/meta]")
+    with console.status(f"[meta] Fetching draft #{draft_id}...[/meta]", spinner="simpleDots"):
 
+  
 
 #Note: Add a new command NAMED: edit_draft for editing draft
